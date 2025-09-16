@@ -1,123 +1,86 @@
-/**
- * Core types for Specify MCP Server
- */
+import type { z } from 'zod';
 
-export interface ProjectContext {
-  readonly projectPath: string;
-  readonly projectType: 'new' | 'existing';
-  readonly name: string;
-  readonly description?: string;
-  readonly createdAt: Date;
-  readonly updatedAt: Date;
+export interface TransportAdapter {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  send(message: unknown): Promise<void>;
+  onMessage(handler: (message: unknown) => Promise<void>): void;
 }
 
-export interface AmbiguityResolution {
-  readonly originalIntent: string;
-  readonly resolvedIntent: string;
-  readonly clarifications: string[];
-  readonly assumptions: string[];
-  readonly constraints: string[];
+export interface SDDStage {
+  name: string;
+  description: string;
+  execute(context: SDDContext): Promise<SDDStageResult>;
+  verify(result: SDDStageResult): Promise<VerificationResult>;
 }
 
-export interface Specification {
-  readonly id: string;
-  readonly title: string;
-  readonly description: string;
-  readonly functionalRequirements: Requirement[];
-  readonly nonFunctionalRequirements: Requirement[];
-  readonly formalSpec?: FormalSpecification;
-  readonly version: string;
-  readonly status: 'draft' | 'review' | 'approved';
+export interface SDDContext {
+  projectId: string;
+  currentStage: string;
+  previousResults: Map<string, SDDStageResult>;
+  metadata: Record<string, unknown>;
 }
 
-export interface Requirement {
-  readonly id: string;
-  readonly description: string;
-  readonly priority: 'high' | 'medium' | 'low';
-  readonly acceptance: string[];
-  readonly dependencies: string[];
+export interface SDDStageResult {
+  stage: string;
+  content: string;
+  artifacts: Map<string, string>;
+  timestamp: number;
+  verified: boolean;
 }
 
-export interface FormalSpecification {
-  readonly preconditions: string[];
-  readonly postconditions: string[];
-  readonly invariants: string[];
-  readonly acslSpec?: string;
+export interface VerificationResult {
+  isValid: boolean;
+  issues: string[];
+  suggestions: string[];
+  confidence: number;
 }
 
-export interface ImplementationPlan {
-  readonly id: string;
-  readonly phases: Phase[];
-  readonly dependencies: DependencyGraph;
-  readonly riskAssessment: RiskAssessment;
-  readonly estimatedDuration: number;
-  readonly teamSize: number;
+export interface ProjectResource {
+  uri: string;
+  name: string;
+  mimeType: string;
+  content: string;
+  metadata?: Record<string, unknown>;
 }
 
-export interface Phase {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  readonly tasks: string[];
-  readonly duration: number;
-  readonly dependencies: string[];
+export type ToolInputSchema = z.ZodType<unknown>;
+
+export interface SDDTool {
+  name: string;
+  description: string;
+  inputSchema: ToolInputSchema;
+  handler: (params: unknown) => Promise<ToolResult>;
 }
 
-export interface DependencyGraph {
-  readonly nodes: DependencyNode[];
-  readonly edges: DependencyEdge[];
+export interface ToolResult {
+  content: Array<{
+    type: 'text' | 'resource';
+    text?: string;
+    uri?: string;
+  }>;
 }
 
-export interface DependencyNode {
-  readonly id: string;
-  readonly type: 'task' | 'phase' | 'milestone';
-  readonly name: string;
+export interface ElicitationRequest {
+  message: string;
+  schema?: z.ZodType<unknown>;
+  options?: string[];
 }
 
-export interface DependencyEdge {
-  readonly from: string;
-  readonly to: string;
-  readonly type: 'depends_on' | 'blocks' | 'relates_to';
+export interface SamplingRequest {
+  messages: Array<{
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+  }>;
+  modelPreferences?: {
+    temperature?: number;
+    maxTokens?: number;
+  };
 }
 
-export interface RiskAssessment {
-  readonly risks: Risk[];
-  readonly overallLevel: 'low' | 'medium' | 'high';
-}
-
-export interface Risk {
-  readonly id: string;
-  readonly description: string;
-  readonly probability: number;
-  readonly impact: number;
-  readonly mitigation: string;
-}
-
-export interface Task {
-  readonly id: string;
-  readonly title: string;
-  readonly description: string;
-  readonly status: 'pending' | 'in_progress' | 'completed' | 'blocked';
-  readonly priority: 'high' | 'medium' | 'low';
-  readonly assignee?: string;
-  readonly dependencies: string[];
-  readonly estimatedHours: number;
-  readonly acceptance: string[];
-  readonly testable: boolean;
-}
-
-export interface SpecifyDocument {
-  readonly path: string;
-  readonly type: 'prd' | 'spec' | 'plan' | 'task' | 'context';
-  readonly content: string;
-  readonly metadata: DocumentMetadata;
-}
-
-export interface DocumentMetadata {
-  readonly version: string;
-  readonly createdAt: Date;
-  readonly updatedAt: Date;
-  readonly author: string;
-  readonly status: string;
-  readonly tags: string[];
+export interface CommonVerificationConfig {
+  enableHallucinationCheck: boolean;
+  enableConsistencyCheck: boolean;
+  enableFactCheck: boolean;
+  consensusRuns?: number;
 }

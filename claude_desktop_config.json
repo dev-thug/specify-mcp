@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "specify-mcp": {
-      "command": "node",
-      "args": ["/Users/hyunjoongkim/specify-mcp/dist/index.js"],
-      "env": {}
-    }
-  }
-}
