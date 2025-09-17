@@ -1,26 +1,24 @@
-# Specify MCP Server
+# Specify MCP - Specification-Driven Development Server
 
-A Model Context Protocol (MCP) server implementing Specification-Driven Development methodology for AI-assisted software development.
+An MCP (Model Context Protocol) server that implements Specification-Driven Development (SDD) methodology, enabling AI-augmented software development with controlled non-determinism and iterative refinement.
 
 ## Overview
 
-This MCP server provides a structured workflow for software development through five distinct stages:
-
-1. **init** - Project initialization and requirements gathering
-2. **spec** - Product Requirements Document (PRD) generation  
-3. **plan** - Technical architecture and technology stack planning
-4. **tasks** - Work breakdown structure and task decomposition
-5. **implement** - Test-Driven Development (TDD) implementation guides
-
-Each stage includes verification modules to control AI hallucination and ensure specification quality.
+Specify MCP provides a structured workflow for software development through five key phases:
+1. **Init** - Project initialization through conversation
+2. **Spec** - Product requirements documentation (PRD) focusing on WHAT and WHY
+3. **Plan** - Technical architecture and implementation planning
+4. **Tasks** - Work breakdown into detailed, testable tasks
+5. **Implement** - TDD-based implementation with pseudo-code and test definitions
 
 ## Features
 
-- 🔄 **Iterative Refinement** - Each stage supports iterative improvement through AI dialogue
-- ✅ **Verification System** - Common and stage-specific verification to ensure quality
-- 📁 **Resource Management** - Structured project file organization
-- 🧪 **TDD Support** - Automatic test generation for multiple frameworks
-- 🏗️ **Extensible Architecture** - Modular design for easy extension
+- 🎯 **AI-Augmented Development** - Leverages LLMs for specification generation and refinement
+- 🔄 **Iterative Refinement** - Each phase supports continuous improvement through AI dialogue
+- ✅ **Verification Modules** - Common and phase-specific validation to control hallucination
+- 📁 **Structured Storage** - Organized `.specify` directory for all project artifacts
+- 🧪 **TDD Focus** - Enforces Test-Driven Development with RED-GREEN-REFACTOR cycle
+- 🔌 **Extensible Transport** - Version 1 with STDIO, extensible to HTTP (Version 2)
 
 ## Installation
 
@@ -32,240 +30,259 @@ cd specify-mcp
 # Install dependencies
 npm install
 
-# Build the project
+# Build the TypeScript code
 npm run build
+
+# Run in development mode
+npm run dev
 ```
 
-## Usage
+## Usage with AI IDE
 
-### As MCP Server
+### Configuration
 
-The server implements the MCP protocol and can be integrated with AI IDEs that support MCP.
-
-```bash
-# Start the server
-npm start
-```
-
-### Configuration for AI IDE
-
-Add to your MCP client configuration:
+Add to your MCP settings configuration:
 
 ```json
 {
   "mcpServers": {
-    "specify": {
+    "specify-mcp": {
       "command": "node",
-      "args": ["path/to/specify-mcp/dist/index.js"],
-      "transport": "stdio"
+      "args": ["/path/to/specify-mcp/dist/index.js"],
+      "env": {}
     }
   }
 }
 ```
 
-## Specify Workflow Tools
+### Available Tools
 
-### 1. initialize_project
+#### `sdd_init`
+Initialize a new SDD project.
 
-Initialize a new project with requirements gathering and setup.
-
-```json
+```typescript
 {
-  "name": "initialize_project",
-  "arguments": {
-    "projectName": "MyProject",
-    "description": "A web application for task management",
-    "domain": "productivity",
-    "goals": ["Improve task tracking", "Enable collaboration"],
-    "constraints": ["Must work offline", "Mobile-first design"]
-  }
+  name: "Project Name",
+  description: "Initial project description"
 }
 ```
 
-### 2. create_specification
+#### `sdd_spec`
+Generate or refine product requirements specification.
 
-Create product specification document focusing on user needs and business value.
-
-```json
+```typescript
 {
-  "name": "create_specification",
-  "arguments": {
-    "projectId": "myproject-1234567890",
-    "userRequirements": "Additional requirements...",
-    "focusAreas": ["user experience", "performance"],
-    "excludeAreas": ["billing", "analytics"]
-  }
+  projectId: "uuid", // Optional, uses current if not provided
+  userInput: "Feature requirements description",
+  refine: false // Set to true for refinement
 }
 ```
 
-### 3. create_technical_plan
+#### `sdd_plan`
+Create technical implementation plan.
 
-Create technical architecture plan with technology stack and design decisions.
-
-```json
+```typescript
 {
-  "name": "create_technical_plan",
-  "arguments": {
-    "projectId": "myproject-1234567890",
-    "techStack": {
-      "frontend": ["React", "TypeScript"],
-      "backend": ["Node.js", "Express"],
-      "database": ["PostgreSQL"],
-      "testing": ["Jest", "Cypress"]
-    },
-    "architecture": "microservices"
-  }
+  projectId: "uuid",
+  techStack: {
+    language: "TypeScript",
+    framework: "Express",
+    database: "PostgreSQL",
+    testing: "Jest"
+  },
+  refine: false
 }
 ```
 
-### 4. breakdown_tasks
+#### `sdd_tasks`
+Break down work into detailed tasks.
 
-Break down project into detailed tasks and create work breakdown structure.
-
-```json
+```typescript
 {
-  "name": "breakdown_tasks",
-  "arguments": {
-    "projectId": "myproject-1234567890",
-    "granularity": "medium",
-    "groupingStrategy": "feature"
-  }
+  projectId: "uuid",
+  granularity: "medium" // "high", "medium", or "low"
 }
 ```
 
-### 5. generate_tests
+#### `sdd_implement`
+Generate TDD implementation guide for a specific task.
 
-Generate TDD tests and implementation guides for development.
-
-```json
+```typescript
 {
-  "name": "generate_tests",
-  "arguments": {
-    "projectId": "myproject-1234567890",
-    "taskId": "TASK-001",
-    "testingFramework": "jest",
-    "tddApproach": "red-green-refactor"
-  }
+  projectId: "uuid",
+  taskId: "T001"
+}
+```
+
+#### `sdd_verify`
+Verify any document for issues.
+
+```typescript
+{
+  content: "Document content to verify",
+  phase: "spec" // "init", "spec", "plan", "tasks", or "implement"
+}
+```
+
+#### `sdd_list_projects`
+List all available projects.
+
+#### `sdd_set_current_project`
+Set the current working project.
+
+```typescript
+{
+  projectId: "uuid"
 }
 ```
 
 ## Project Structure
 
 ```
-specify-mcp/
-├── src/
-│   ├── index.ts              # Main server entry point
-│   ├── types/                # TypeScript type definitions
-│   ├── transport/            # Transport layer (STDIO/HTTP)
-│   ├── tools/                # SDD workflow tools
-│   │   ├── init.ts          # Project initialization
-│   │   ├── spec.ts          # Specification generation
-│   │   ├── plan.ts          # Technical planning
-│   │   ├── tasks.ts         # Task breakdown
-│   │   └── implement.ts     # TDD implementation
-│   ├── resources/            # Resource management
-│   └── verification/         # Verification modules
-├── sdd-projects/             # Generated project files
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## Generated Project Structure
-
-Each Specify project creates the following structure:
-
-```
 .specify/
-└── {project-name}/
-    ├── metadata.json        # Project metadata
-    ├── README.md           # Project overview
-    ├── init/              # Initialization artifacts
-    ├── spec/              # Specification documents
-    ├── plan/              # Technical plans and ADRs
-    ├── tasks/             # Task breakdown structure
-    └── implement/         # TDD implementation guides
+├── projects/
+│   └── [project-id]/
+│       ├── project.json
+│       ├── spec/
+│       │   ├── current.md
+│       │   └── versions/
+│       ├── plan/
+│       │   ├── current.md
+│       │   ├── research.md
+│       │   └── data-model.md
+│       ├── tasks/
+│       │   └── [task-id]/
+│       │       ├── index.md
+│       │       └── implementation.md
+│       └── implementations/
+│           ├── tests/
+│           └── code/
+├── templates/
+├── cache/
+└── logs/
+```
+
+## Workflow Example
+
+```bash
+# 1. Initialize project
+> Use tool: sdd_init
+  Input: { name: "Todo App", description: "A simple todo application" }
+
+# 2. Create specification
+> Use tool: sdd_spec
+  Input: { userInput: "Users can create, edit, delete todos..." }
+
+# 3. Plan technical implementation
+> Use tool: sdd_plan
+  Input: { techStack: { language: "TypeScript", framework: "Express" } }
+
+# 4. Generate tasks
+> Use tool: sdd_tasks
+  Input: { granularity: "medium" }
+
+# 5. Implement specific task
+> Use tool: sdd_implement
+  Input: { taskId: "T001" }
 ```
 
 ## Verification System
 
-### Common Verification
-- Hallucination detection
-- Consistency checking
-- Fact verification
-- Multi-run consensus
+The server includes comprehensive verification for:
 
-### Stage-Specific Verification
-- **init**: Project information completeness
-- **spec**: Requirement ambiguity detection
-- **plan**: Technology compatibility checks
-- **tasks**: Coverage and dependency validation
-- **implement**: Test completeness verification
-
-## Development
-
-```bash
-# Run in development mode
-npm run dev
-
-# Run tests
-npm test
-
-# Lint code
-npm run lint
-
-# Format code
-npm run format
-```
+- **Hallucination Detection** - Identifies uncertain or speculative language
+- **Ambiguity Detection** - Flags vague or unclear terms
+- **Technical Consistency** - Ensures alignment across phases
+- **Completeness Checking** - Validates required sections and content
+- **TDD Compliance** - Enforces test-first development
 
 ## Architecture
 
 ### Core Components
 
-1. **MCP Server** - Handles JSON-RPC communication
-2. **Transport Layer** - Abstracted for STDIO/HTTP support
-3. **Tool Registry** - Manages SDD workflow tools
-4. **Resource Manager** - File system operations
-5. **Verification Pipeline** - Quality assurance
+- **Transport Layer** - Abstract transport with STDIO implementation
+- **Resource Manager** - Handles `.specify` directory and file operations
+- **Verification Module** - Common and phase-specific validators
+- **Tool Implementations** - Individual tools for each SDD phase
+- **Template System** - Markdown templates for consistent documentation
 
-### Design Principles
+### Technology Stack
 
-- **Modularity** - Each stage is independent
-- **Extensibility** - Easy to add new stages or verifiers
-- **Type Safety** - Full TypeScript implementation
-- **Clean Code** - Following best practices
+- **Language**: TypeScript 5.3+
+- **Runtime**: Node.js 20+
+- **MCP SDK**: @modelcontextprotocol/sdk
+- **Testing**: Jest
+- **Validation**: Zod
+- **Logging**: Winston
 
-## Roadmap
+## Development
 
-### Version 1.0 (Current)
-- [x] STDIO transport
-- [x] Core Specify workflow
-- [x] Basic verification
-- [x] Resource management
+### Running Tests
 
-### Version 2.0 (Planned)
-- [ ] HTTP transport with authentication
-- [ ] Enhanced verification with LLM
-- [ ] Web dashboard
-- [ ] Multi-project management
-- [ ] Team collaboration features
+```bash
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Watch mode
+npm run test:watch
+```
+
+### Code Quality
+
+```bash
+# Lint code
+npm run lint
+
+# Fix linting issues
+npm run lint:fix
+
+# Format code
+npm run format
+
+# Type checking
+npm run typecheck
+```
+
+## Clean Code Principles
+
+The project follows clean code guidelines:
+
+- ✅ Meaningful names revealing intent
+- ✅ Single responsibility functions
+- ✅ DRY (Don't Repeat Yourself)
+- ✅ Proper encapsulation and interfaces
+- ✅ Test-Driven Development
+- ✅ Continuous refactoring
+
+## Future Enhancements (Version 2)
+
+- 🌐 HTTP transport with REST API
+- 🔐 JWT authentication and authorization
+- 🚀 Remote deployment capabilities
+- 📊 Analytics and metrics dashboard
+- 🤝 Multi-user collaboration
+- 🔄 Real-time synchronization
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+1. Fork the repository
+2. Create a feature branch
+3. Follow TDD principles
+4. Ensure all tests pass
+5. Submit a pull request
 
 ## License
 
 MIT License - See LICENSE file for details
 
-## Based On
+## References
 
-This implementation is based on the AI-SDD paper and Specification-Driven Development methodology, integrating:
-
-- AI-Augmented Specification-Driven Development principles
-- Test-Driven Development practices
-- Model Context Protocol standards
-- Clean Code principles
+- [Model Context Protocol](https://modelcontextprotocol.io)
+- [AI-SDD Paper](doc/ai-sdd.md)
+- [Specification-Driven Development](doc/spec-driven.md)
 
 ## Support
 
@@ -273,12 +290,4 @@ For issues, questions, or suggestions, please open an issue on GitHub.
 
 ---
 
-## Important Notes
-
-### Project ID Handling
-When using the tools, the `initialize_project` tool returns a PROJECT_ID that must be used for subsequent tools. The ID is clearly marked in the response as `PROJECT_ID: {project-name}`.
-
-### Template-Based Output
-All specifications follow the structured templates in the `templates/` directory, ensuring consistent and comprehensive documentation with [NEEDS CLARIFICATION] markers for ambiguous requirements.
-
-**Note**: This version uses local STDIO transport. HTTP transport with authentication will be added in version 2.0.
+*Built with ❤️ for AI-augmented software development*

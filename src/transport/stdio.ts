@@ -1,41 +1,78 @@
+/**
+ * STDIO transport implementation for MCP server
+ * Handles communication via process.stdin and process.stdout
+ */
+
 import { BaseTransport } from './base.js';
+import { IJsonRpcResponse } from '../types/index.js';
 import * as readline from 'readline';
 
 export class StdioTransport extends BaseTransport {
-  private rl?: readline.Interface;
-  private buffer = '';
+  private reader?: readline.Interface;
 
   async start(): Promise<void> {
-    this.rl = readline.createInterface({
+    if (this.isRunning) {
+      throw new Error('Transport already running');
+    }
+
+    // Create readline interface for reading from stdin
+    this.reader = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
-      terminal: false
+      terminal: false,
     });
 
-    this.rl.on('line', (line) => {
-      this.buffer += line;
-      
-      // Try to parse complete JSON-RPC messages
-      try {
-        const message = JSON.parse(this.buffer);
-        this.buffer = '';
-        void this.handleIncomingMessage(message);
-      } catch {
-        // Not a complete JSON yet, continue buffering
-      }
+    // Set up message handling
+    this.reader.on('line', (line) => {
+      void this.processLine(line);
     });
 
-    process.stdin.on('end', () => {
+    this.reader.on('close', () => {
       void this.stop();
     });
+
+    this.isRunning = true;
+    
+    // Send ready signal
+    this.emit('ready');
   }
 
   async stop(): Promise<void> {
-    this.rl?.close();
+    if (!this.isRunning) {
+      return;
+    }
+
+    this.isRunning = false;
+    
+    if (this.reader) {
+      this.reader.close();
+      this.reader = undefined as any;
+    }
+
+    this.emit('stopped');
   }
 
-  async send(message: unknown): Promise<void> {
-    const json = JSON.stringify(message);
-    process.stdout.write(json + '\n');
+  async send(message: IJsonRpcResponse): Promise<void> {
+    if (!this.isRunning) {
+      throw new Error('Transport not running');
+    }
+
+    const formatted = this.formatJsonRpcMessage(message);
+    
+    // MCP uses line-delimited JSON for STDIO
+    process.stdout.write(`${formatted}\n`);
+  }
+
+  private async processLine(line: string): Promise<void> {
+    // Trim whitespace
+    const trimmed = line.trim();
+    
+    // Skip empty lines
+    if (!trimmed) {
+      return;
+    }
+
+    // Process as complete JSON-RPC message
+    await this.handleIncomingMessage(trimmed);
   }
 }

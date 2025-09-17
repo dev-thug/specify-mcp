@@ -1,202 +1,380 @@
-import type { 
-  VerificationResult, 
-  CommonVerificationConfig
-} from '../types/index.js';
+/**
+ * Common verification module for hallucination and ambiguity detection
+ * Based on AI-SDD paper principles
+ */
+
+import { IValidationResult, IVerificationContext } from '../types/index.js';
 
 export class CommonVerifier {
-  private readonly config: CommonVerificationConfig;
+  private readonly hallucinationPatterns = [
+    /\b(probably|maybe|might|could be|I think|I believe|assume|guess)\b/gi,
+    /\b(should work|ought to|supposed to)\b/gi,
+    /\b(TODO|FIXME|XXX|HACK)\b/gi,
+    /\[NEEDS CLARIFICATION[^\]]*\]/gi,
+  ];
 
-  constructor(config: Partial<CommonVerificationConfig> = {}) {
-    this.config = {
-      enableHallucinationCheck: true,
-      enableConsistencyCheck: true,
-      enableFactCheck: true,
-      consensusRuns: 3,
-      ...config
-    };
-  }
+  private readonly ambiguityPatterns = [
+    /\b(some|many|few|several|various|certain)\b/gi,
+    /\b(fast|slow|good|bad|better|worse|optimal|efficient)\b/gi,
+    /\b(soon|later|eventually|when possible)\b/gi,
+    /\b(etc|and so on|and more)\b/gi,
+    /\b(appropriate|suitable|reasonable|adequate)\b/gi,
+  ];
 
-  async verify(content: string, context?: Record<string, unknown>): Promise<VerificationResult> {
-    const issues: string[] = [];
-    const suggestions: string[] = [];
-    let confidence = 1.0;
+  private readonly technicalDetailPatterns = [
+    /\b(React|Vue|Angular|Express|Django|Flask|Rails)\b/g,
+    /\b(PostgreSQL|MySQL|MongoDB|Redis|SQLite)\b/g,
+    /\b(TypeScript|JavaScript|Python|Java|C\+\+|Rust)\b/g,
+    /\b(REST|GraphQL|gRPC|WebSocket)\b/g,
+    /\b(Docker|Kubernetes|AWS|Azure|GCP)\b/g,
+  ];
 
-    if (this.config.enableHallucinationCheck) {
-      const hallucinationResult = await this.checkHallucination(content);
-      issues.push(...hallucinationResult.issues);
-      suggestions.push(...hallucinationResult.suggestions);
-      confidence *= hallucinationResult.confidence;
-    }
-
-    if (this.config.enableConsistencyCheck) {
-      const consistencyResult = await this.checkConsistency(content, context);
-      issues.push(...consistencyResult.issues);
-      suggestions.push(...consistencyResult.suggestions);
-      confidence *= consistencyResult.confidence;
-    }
-
-    if (this.config.enableFactCheck) {
-      const factResult = await this.checkFacts(content);
-      issues.push(...factResult.issues);
-      suggestions.push(...factResult.suggestions);
-      confidence *= factResult.confidence;
-    }
-
-    return {
-      isValid: issues.length === 0,
-      issues,
-      suggestions,
-      confidence
-    };
-  }
-
-  async runWithConsensus(
-    content: string,
-    runs: number = this.config.consensusRuns || 3
-  ): Promise<VerificationResult[]> {
-    const results: VerificationResult[] = [];
+  async verify(context: IVerificationContext): Promise<IValidationResult[]> {
+    const results: IValidationResult[] = [];
     
-    for (let i = 0; i < runs; i++) {
-      const result = await this.verify(content);
-      results.push(result);
+    // Check for hallucination indicators
+    const hallucinationResults = this.detectHallucination(context);
+    results.push(...hallucinationResults);
+    
+    // Check for ambiguity
+    const ambiguityResults = this.detectAmbiguity(context);
+    results.push(...ambiguityResults);
+    
+    // Phase-specific checks
+    if (context.phase === 'spec') {
+      const specResults = this.verifySpecification(context);
+      results.push(...specResults);
+    } else if (context.phase === 'plan') {
+      const planResults = this.verifyPlan(context);
+      results.push(...planResults);
+    } else if (context.phase === 'tasks') {
+      const taskResults = this.verifyTasks(context);
+      results.push(...taskResults);
+    } else if (context.phase === 'implement') {
+      const implResults = this.verifyImplementation(context);
+      results.push(...implResults);
     }
-
+    
+    // Check consistency with previous versions
+    if (context.previousVersions && context.previousVersions.length > 0) {
+      const consistencyResults = this.checkConsistency(context);
+      results.push(...consistencyResults);
+    }
+    
     return results;
   }
 
-  private async checkHallucination(content: string): Promise<VerificationResult> {
-    const issues: string[] = [];
-    const suggestions: string[] = [];
-
-    // Check for common hallucination patterns
-    const hallucinationPatterns = [
-      /as of my last update/i,
-      /I don't have access to/i,
-      /I cannot access/i,
-      /hypothetically/i,
-      /supposedly/i
-    ];
-
-    for (const pattern of hallucinationPatterns) {
-      if (pattern.test(content)) {
-        issues.push(`Potential hallucination detected: ${pattern.source}`);
-        suggestions.push('Remove uncertain language and verify facts');
-      }
-    }
-
-    // Check for unexplained technical terms
-    const technicalTerms = content.match(/\b[A-Z]{2,}(?:[a-z]+[A-Z])*[a-z]*\b/g) || [];
-    const unexplainedTerms = technicalTerms.filter(term => 
-      !content.includes(`${term} (`) && !content.includes(`${term} is`)
-    );
-
-    if (unexplainedTerms.length > 0) {
-      suggestions.push(`Consider explaining technical terms: ${unexplainedTerms.join(', ')}`);
-    }
-
-    return {
-      isValid: issues.length === 0,
-      issues,
-      suggestions,
-      confidence: issues.length === 0 ? 0.95 : 0.7
-    };
-  }
-
-  private async checkConsistency(
-    content: string, 
-    context?: Record<string, unknown>
-  ): Promise<VerificationResult> {
-    const issues: string[] = [];
-    const suggestions: string[] = [];
-
-    // Check for contradictions within the content
-    const sentences = content.split(/[.!?]+/).filter(s => s.trim());
-    const contradictionPairs = [
-      ['must', 'optional'],
-      ['always', 'sometimes'],
-      ['required', 'optional'],
-      ['synchronous', 'asynchronous']
-    ];
-
-    for (const [term1, term2] of contradictionPairs) {
-      const hasTerm1 = sentences.some(s => s.toLowerCase().includes(term1));
-      const hasTerm2 = sentences.some(s => s.toLowerCase().includes(term2));
-      
-      if (hasTerm1 && hasTerm2) {
-        issues.push(`Potential contradiction: both "${term1}" and "${term2}" used`);
-        suggestions.push('Clarify whether requirements are mandatory or optional');
-      }
-    }
-
-    // Check consistency with context
-    if (context?.previousContent) {
-      const prevContent = String(context.previousContent);
-      if (prevContent && this.hasContradiction(content, prevContent)) {
-        issues.push('Content contradicts previous specifications');
-        suggestions.push('Review and align with previous decisions');
-      }
-    }
-
-    return {
-      isValid: issues.length === 0,
-      issues,
-      suggestions,
-      confidence: issues.length === 0 ? 0.9 : 0.6
-    };
-  }
-
-  private async checkFacts(content: string): Promise<VerificationResult> {
-    const issues: string[] = [];
-    const suggestions: string[] = [];
-
-    // Check for verifiable facts
-    const numberClaims = content.match(/\d+\s*(?:%|percent|times|x)/gi) || [];
-    if (numberClaims.length > 0) {
-      suggestions.push(`Verify numerical claims: ${numberClaims.join(', ')}`);
-    }
-
-    // Check for date/time claims
-    const dateClaims = content.match(/\d{4}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b/gi) || [];
-    if (dateClaims.length > 0) {
-      suggestions.push('Verify date and timeline accuracy');
-    }
-
-    // Check for technology version claims
-    const versionClaims = content.match(/v?\d+\.\d+(?:\.\d+)?/g) || [];
-    if (versionClaims.length > 0) {
-      suggestions.push(`Verify version numbers: ${versionClaims.join(', ')}`);
-    }
-
-    return {
-      isValid: issues.length === 0,
-      issues,
-      suggestions,
-      confidence: 0.85
-    };
-  }
-
-  private hasContradiction(content1: string, content2: string): boolean {
-    // Simple contradiction detection - can be enhanced with NLP
-    // const normalize = (s: string): string => s.toLowerCase().trim();
+  private detectHallucination(context: IVerificationContext): IValidationResult[] {
+    const results: IValidationResult[] = [];
+    const lines = context.content.split('\n');
     
-    const negationPairs = [
-      ['will', 'will not'],
-      ['should', 'should not'],
-      ['must', 'must not'],
-      ['can', 'cannot']
-    ];
+    lines.forEach((line, index) => {
+      for (const pattern of this.hallucinationPatterns) {
+        const matches = line.match(pattern);
+        if (matches) {
+          results.push({
+            type: 'warning',
+            category: 'hallucination',
+            message: `Potential hallucination detected: "${matches[0]}"`,
+            location: `Line ${index + 1}`,
+            suggestion: 'Replace with concrete, verifiable information',
+            confidence: 0.7,
+          });
+        }
+      }
+    });
+    
+    return results;
+  }
 
-    for (const [positive, negative] of negationPairs) {
-      const has1Positive = content1.toLowerCase().includes(positive);
-      const has1Negative = content1.toLowerCase().includes(negative);
-      const has2Positive = content2.toLowerCase().includes(positive);
-      const has2Negative = content2.toLowerCase().includes(negative);
+  private detectAmbiguity(context: IVerificationContext): IValidationResult[] {
+    const results: IValidationResult[] = [];
+    const lines = context.content.split('\n');
+    
+    lines.forEach((line, index) => {
+      for (const pattern of this.ambiguityPatterns) {
+        const matches = line.match(pattern);
+        if (matches) {
+          results.push({
+            type: 'warning',
+            category: 'ambiguity',
+            message: `Ambiguous term detected: "${matches[0]}"`,
+            location: `Line ${index + 1}`,
+            suggestion: 'Use specific, measurable terms',
+            confidence: 0.6,
+          });
+        }
+      }
+    });
+    
+    return results;
+  }
 
-      if ((has1Positive && has2Negative) || (has1Negative && has2Positive)) {
-        return true;
+  private verifySpecification(context: IVerificationContext): IValidationResult[] {
+    const results: IValidationResult[] = [];
+    const content = context.content.toLowerCase();
+    
+    // Check for technical details in spec
+    for (const pattern of this.technicalDetailPatterns) {
+      const matches = context.content.match(pattern);
+      if (matches) {
+        results.push({
+          type: 'error',
+          category: 'inconsistency',
+          message: `Technical implementation detail found in specification: "${matches[0]}"`,
+          location: 'Specification document',
+          suggestion: 'Remove technical details, focus on WHAT and WHY',
+          confidence: 0.9,
+        });
       }
     }
+    
+    // Check for required sections
+    const requiredSections = ['user scenarios', 'requirements', 'acceptance'];
+    for (const section of requiredSections) {
+      if (!content.includes(section)) {
+        results.push({
+          type: 'error',
+          category: 'incompleteness',
+          message: `Missing required section: ${section}`,
+          location: 'Specification structure',
+          suggestion: `Add ${section} section to the specification`,
+          confidence: 0.95,
+        });
+      }
+    }
+    
+    // Check for testable requirements
+    const requirementPattern = /\bMUST\b/g;
+    const requirements = context.content.match(requirementPattern);
+    if (!requirements || requirements.length < 3) {
+      results.push({
+        type: 'warning',
+        category: 'incompleteness',
+        message: 'Insufficient testable requirements',
+        location: 'Requirements section',
+        suggestion: 'Add more specific, testable requirements using MUST keyword',
+        confidence: 0.8,
+      });
+    }
+    
+    return results;
+  }
 
-    return false;
+  private verifyPlan(context: IVerificationContext): IValidationResult[] {
+    const results: IValidationResult[] = [];
+    const content = context.content.toLowerCase();
+    
+    // Check for tech stack definition
+    if (!content.includes('language') || !content.includes('framework')) {
+      results.push({
+        type: 'error',
+        category: 'incompleteness',
+        message: 'Missing technology stack definition',
+        location: 'Technical Context section',
+        suggestion: 'Define language, framework, and key dependencies',
+        confidence: 0.9,
+      });
+    }
+    
+    // Check for testing strategy
+    if (!content.includes('test') || !content.includes('tdd')) {
+      results.push({
+        type: 'warning',
+        category: 'incompleteness',
+        message: 'Testing strategy not defined',
+        location: 'Plan document',
+        suggestion: 'Include TDD approach and testing tools',
+        confidence: 0.75,
+      });
+    }
+    
+    // Check for architecture decisions
+    if (!content.includes('architecture') && !content.includes('structure')) {
+      results.push({
+        type: 'warning',
+        category: 'incompleteness',
+        message: 'Architecture decisions not documented',
+        location: 'Plan document',
+        suggestion: 'Document high-level architecture and project structure',
+        confidence: 0.7,
+      });
+    }
+    
+    return results;
+  }
+
+  private verifyTasks(context: IVerificationContext): IValidationResult[] {
+    const results: IValidationResult[] = [];
+    const lines = context.content.split('\n');
+    
+    // Check for task numbering and structure
+    const taskPattern = /T\d{3}/;
+    const tasks = lines.filter(line => taskPattern.test(line));
+    
+    if (tasks.length < 5) {
+      results.push({
+        type: 'warning',
+        category: 'incompleteness',
+        message: 'Insufficient task breakdown',
+        location: 'Tasks document',
+        suggestion: 'Break down work into more granular tasks',
+        confidence: 0.7,
+      });
+    }
+    
+    // Check for test-first approach
+    const testTasks = tasks.filter(task => task.toLowerCase().includes('test'));
+    // Check implementation tasks exist
+    
+    if (testTasks.length === 0) {
+      results.push({
+        type: 'error',
+        category: 'inconsistency',
+        message: 'No test tasks found',
+        location: 'Tasks document',
+        suggestion: 'Add test tasks before implementation tasks (TDD)',
+        confidence: 0.9,
+      });
+    }
+    
+    // Check for parallel task marking
+    const parallelTasks = tasks.filter(task => task.includes('[P]'));
+    if (parallelTasks.length === 0 && tasks.length > 10) {
+      results.push({
+        type: 'info',
+        category: 'incompleteness',
+        message: 'No parallel tasks identified',
+        location: 'Tasks document',
+        suggestion: 'Mark independent tasks with [P] for parallel execution',
+        confidence: 0.6,
+      });
+    }
+    
+    return results;
+  }
+
+  private verifyImplementation(context: IVerificationContext): IValidationResult[] {
+    const results: IValidationResult[] = [];
+    const content = context.content.toLowerCase();
+    
+    // Check for TDD phases
+    const tddPhases = ['red', 'green', 'refactor'];
+    for (const phase of tddPhases) {
+      if (!content.includes(phase)) {
+        results.push({
+          type: 'warning',
+          category: 'incompleteness',
+          message: `TDD phase not mentioned: ${phase}`,
+          location: 'Implementation document',
+          suggestion: `Document ${phase} phase of TDD cycle`,
+          confidence: 0.7,
+        });
+      }
+    }
+    
+    // Check for test definitions
+    if (!content.includes('test') || !content.includes('expect')) {
+      results.push({
+        type: 'error',
+        category: 'incompleteness',
+        message: 'Test definitions missing',
+        location: 'Implementation document',
+        suggestion: 'Add concrete test cases with expectations',
+        confidence: 0.85,
+      });
+    }
+    
+    // Check for pseudo-code or implementation guidance
+    if (!content.includes('pseudo') && !content.includes('approach') && !content.includes('algorithm')) {
+      results.push({
+        type: 'warning',
+        category: 'incompleteness',
+        message: 'Implementation approach not documented',
+        location: 'Implementation document',
+        suggestion: 'Add pseudo-code or implementation approach',
+        confidence: 0.65,
+      });
+    }
+    
+    return results;
+  }
+
+  private checkConsistency(context: IVerificationContext): IValidationResult[] {
+    const results: IValidationResult[] = [];
+    
+    if (!context.previousVersions || context.previousVersions.length === 0) {
+      return results;
+    }
+    
+    const currentWords = new Set(context.content.toLowerCase().split(/\s+/));
+    const firstVersion = context.previousVersions[0];
+    if (!firstVersion) {
+      return results;
+    }
+    const previousWords = new Set(firstVersion.toLowerCase().split(/\s+/));
+    
+    // Calculate similarity
+    const intersection = new Set([...currentWords].filter(x => previousWords.has(x)));
+    const similarity = (intersection.size * 2) / (currentWords.size + previousWords.size);
+    
+    // Check for major changes
+    if (similarity < 0.5) {
+      results.push({
+        type: 'warning',
+        category: 'inconsistency',
+        message: 'Significant changes from previous version detected',
+        location: 'Document comparison',
+        suggestion: 'Review changes to ensure continuity',
+        confidence: 0.7,
+      });
+    }
+    
+    // Check for removed requirements (spec phase)
+    if (context.phase === 'spec') {
+      const firstVersion = context.previousVersions[0];
+      if (!firstVersion) {
+        return results;
+      }
+      const prevRequirements = firstVersion.match(/\bMUST\b[^.]+\./g) || [];
+      const currRequirements = context.content.match(/\bMUST\b[^.]+\./g) || [];
+      
+      const removed = prevRequirements.filter(req => 
+        !currRequirements.some(curr => curr.includes(req.substring(0, 20)))
+      );
+      
+      if (removed.length > 0) {
+        results.push({
+          type: 'warning',
+          category: 'inconsistency',
+          message: `${removed.length} requirement(s) removed from previous version`,
+          location: 'Requirements section',
+          suggestion: 'Verify requirement removal is intentional',
+          confidence: 0.8,
+        });
+      }
+    }
+    
+    return results;
+  }
+
+  // Calculate confidence score for overall document
+  calculateConfidence(results: IValidationResult[]): number {
+    if (results.length === 0) return 1.0;
+    
+    const weights = {
+      error: 0.3,
+      warning: 0.15,
+      info: 0.05,
+    };
+    
+    let totalPenalty = 0;
+    
+    for (const result of results) {
+      const weight = weights[result.type] || 0;
+      totalPenalty += weight * result.confidence;
+    }
+    
+    return Math.max(0, 1.0 - totalPenalty);
   }
 }

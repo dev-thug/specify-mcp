@@ -1,0 +1,112 @@
+{
+  "name": "specify-mcp",
+  "version": "1.0.0",
+  "description": "Specification-Driven Development MCP Server",
+  "vendor": "Specify",
+  "capabilities": {
+    "tools": {
+      "list": true,
+      "call": true
+    },
+    "resources": {
+      "list": true,
+      "read": true,
+      "write": true,
+      "subscribe": false
+    },
+    "prompts": {
+      "list": true,
+      "get": true
+    },
+    "logging": {
+      "levels": ["debug", "info", "warn", "error"]
+    }
+  },
+  "transport": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["dist/index.js"],
+    "env": {
+      "NODE_ENV": "production"
+    }
+  },
+  "tools": [
+    {
+      "name": "specify_init",
+      "description": "Initialize a new project with specification-driven approach"
+    },
+    {
+      "name": "specify_requirements",
+      "description": "Generate product requirements specification focusing on WHAT and WHY"
+    },
+    {
+      "name": "specify_plan",
+      "description": "Create technical architecture and implementation plan"
+    },
+    {
+      "name": "specify_breakdown",
+      "description": "Break down project into detailed, testable tasks with TDD approach"
+    },
+    {
+      "name": "specify_implement",
+      "description": "Generate TDD implementation guide with test definitions and pseudo-code"
+    },
+    {
+      "name": "specify_verify",
+      "description": "Verify documents for hallucinations, ambiguities, and consistency issues"
+    },
+    {
+      "name": "specify_list_projects",
+      "description": "List all specification-driven projects"
+    },
+    {
+      "name": "specify_set_project",
+      "description": "Set the current active project for subsequent operations"
+    }
+  ],
+  "resourceTypes": [
+    {
+      "uri": "specify://project/*/metadata",
+      "mimeType": "application/json",
+      "description": "Project configuration and metadata"
+    },
+    {
+      "uri": "specify://project/*/spec/*",
+      "mimeType": "text/markdown",
+      "description": "Specification documents"
+    },
+    {
+      "uri": "specify://project/*/plan/*",
+      "mimeType": "text/markdown",
+      "description": "Technical planning documents"
+    },
+    {
+      "uri": "specify://project/*/task/*",
+      "mimeType": "text/markdown",
+      "description": "Task breakdown and details"
+    },
+    {
+      "uri": "specify://project/*/implementation/*",
+      "mimeType": "text/markdown",
+      "description": "TDD implementation guides"
+    }
+  ],
+  "prompts": [
+    {
+      "name": "sdd_workflow",
+      "description": "Complete SDD workflow guidance"
+    },
+    {
+      "name": "spec_template",
+      "description": "Specification writing template"
+    },
+    {
+      "name": "plan_template",
+      "description": "Technical planning template"
+    },
+    {
+      "name": "tdd_guide",
+      "description": "Test-Driven Development guide"
+    }
+  ]
+}
