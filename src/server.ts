@@ -239,6 +239,30 @@ export class SDDMCPServer {
             },
           },
           {
+            name: 'workflow_enforce',
+            description: '🚨 CRITICAL: Check and enforce SDD workflow compliance - prevents unauthorized implementation',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                action: {
+                  type: 'string',
+                  enum: ['check', 'enforce', 'status'],
+                  description: 'Workflow enforcement action',
+                },
+                project_path: {
+                  type: 'string',
+                  description: 'Project directory path',
+                },
+                target_phase: {
+                  type: 'string',
+                  enum: ['init', 'spec', 'plan', 'tasks', 'implement'],
+                  description: 'Phase to check/enforce',
+                },
+              },
+              required: ['action', 'project_path'],
+            },
+          },
+          {
             name: 'specify_status',
             description: 'Analyze project status and provide workflow guidance',
             inputSchema: {
@@ -388,6 +412,22 @@ export class SDDMCPServer {
                 {
                   type: 'text',
                   text: result,
+                },
+              ],
+            };
+          }
+
+          case 'workflow_enforce': {
+            // Import and execute workflow enforcement
+            const { workflowEnforcer } = await import('./tools/workflow-enforcer.js');
+            const result = await workflowEnforcer(args as any);
+            
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: typeof result === 'string' ? result : 
+                        (result.message || JSON.stringify(result, null, 2)),
                 },
               ],
             };

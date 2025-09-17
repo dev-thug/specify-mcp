@@ -5,6 +5,7 @@
 
 import { ResourceManager } from '../resources/manager.js';
 import { CommonVerifier } from '../verification/common.js';
+import { workflowEnforcer } from './workflow-enforcer.js';
 import { IVerificationContext } from '../types/index.js';
 import { WorkflowGuard } from '../workflow/workflow-guard.js';
 import * as path from 'path';
@@ -22,9 +23,9 @@ export class ImplementTool {
     private readonly verifier: CommonVerifier
   ) {}
 
-  async execute(params: ImplementToolParams): Promise<string> {
+  async execute(params: ImplementToolParams & { projectPath?: string }): Promise<string> {
     const { projectId, taskId } = params;
-
+    
     // Get project path for workflow check
     const projectStructure = this.resourceManager.getProject(projectId);
     if (!projectStructure) {
@@ -32,8 +33,21 @@ export class ImplementTool {
     }
 
     // Check if ready to proceed to implementation phase
-    const projectPath = path.dirname(projectStructure.projectPath);
-    const workflowStatus = await this.workflowGuard.checkPhaseReadiness(projectPath, 'implement');
+    const projectDir = path.dirname(projectStructure.projectPath);
+    
+    // WORKFLOW ENFORCEMENT: Check if implementation is allowed
+    const enforcementResult = await workflowEnforcer({
+      action: 'enforce',
+      project_path: projectDir,
+      target_phase: 'implement'
+    });
+    
+    // If blocked, return strict enforcement message
+    if (!enforcementResult.success || (enforcementResult as any).blocked) {
+      return enforcementResult.message || 'Implementation blocked by workflow guard';
+    }
+
+    const workflowStatus = await this.workflowGuard.checkPhaseReadiness(projectDir, 'implement');
     
     if (!workflowStatus.canProceed) {
       return this.generateWorkflowBlockMessage(workflowStatus);

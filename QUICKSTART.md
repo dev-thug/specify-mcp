@@ -256,6 +256,72 @@ Use `sdd_verify` to check documents for issues:
 AI: Verify my specification using specify_verify tool
 ```
 
+## 🚨 **CRITICAL: AI Agent Workflow Compliance**
+
+**ATTENTION AI AGENTS**: This section contains **MANDATORY** instructions that you **MUST** follow.
+
+### **Workflow Enforcement Protocol**
+
+Before ANY implementation work, you **MUST** check workflow compliance:
+
+```bash
+# MANDATORY: Check if implementation is allowed
+workflow_enforce({
+  "action": "enforce", 
+  "project_path": "/path/to/project",
+  "target_phase": "implement"
+})
+```
+
+### **Strict Rules for AI Agents**
+
+#### **❌ ABSOLUTELY PROHIBITED**:
+- Writing code files without completing SDD phases
+- Bypassing `workflow_enforce` checks  
+- Ignoring quality gate requirements
+- Proceeding with implementation when blocked
+- Creating technical documents without proper specification
+
+#### **✅ MANDATORY SEQUENCE**:
+1. **FIRST**: Always check `workflow_enforce` before any phase
+2. **IF BLOCKED**: Complete required SDD phases using MCP tools
+3. **ONLY WHEN ALLOWED**: Proceed with implementation
+4. **NEVER BYPASS**: The SDD workflow process
+
+### **Example of Correct Agent Behavior**
+
+```typescript
+// ✅ CORRECT: Check before proceeding
+const enforcement = await workflow_enforce({
+  action: "enforce",
+  project_path: "/my/project", 
+  target_phase: "implement"
+});
+
+if (enforcement.blocked) {
+  // Follow the strict instructions
+  console.log(enforcement.strict_instructions);
+  // Complete required actions before proceeding
+  return;
+}
+
+// Only now can you proceed with implementation
+```
+
+### **Quality Gates You Must Respect**
+
+| Phase | Minimum Quality | Required Before |
+|-------|----------------|-----------------|  
+| spec | 75% | Planning |
+| plan | 80% | Task breakdown |
+| tasks | 78% | Implementation |
+| implement | 85% | Code generation |
+
+### **Remember**: 
+> *"Through iterative dialogue with AI, this idea becomes a comprehensive PRD"*
+
+The SDD process exists to ensure quality. **Trust the process!**
+
 ### 5. Use Appropriate Granularity
 
 - `high`: Detailed tasks for complex projects

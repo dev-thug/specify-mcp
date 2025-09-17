@@ -7,6 +7,7 @@
 import fs from 'fs-extra';
 import * as path from 'path';
 import { AdvancedQualityAnalyzer } from '../verification/advanced-quality-analyzer.js';
+import { AgentBehaviorController, AgentGuidance } from '../enforcement/agent-behavior-controller.js';
 
 export interface WorkflowGate {
   phase: 'init' | 'spec' | 'plan' | 'tasks' | 'implement';
@@ -23,6 +24,8 @@ export interface WorkflowStatus {
   qualityScore: number;
   iterationCount: number;
   recommendations: string[];
+  agentGuidance: AgentGuidance;  // NEW: Strict agent control
+  strictInstructions: string;     // NEW: Formatted instructions for agent
 }
 
 export class WorkflowGuard {
@@ -65,13 +68,22 @@ export class WorkflowGuard {
   ): Promise<WorkflowStatus> {
     const gate = this.gates.find(g => g.phase === targetPhase);
     if (!gate) {
+      // Generate default agent guidance for unknown phase
+      const defaultGuidance = AgentBehaviorController.generateStrictGuidance(
+        'init',
+        0,
+        [`Unknown phase: ${targetPhase}`]
+      );
+      
       return {
         currentPhase: 'init',
         canProceed: false,
         blockingReasons: [`Unknown phase: ${targetPhase}`],
         qualityScore: 0,
         iterationCount: 0,
-        recommendations: []
+        recommendations: [],
+        agentGuidance: defaultGuidance,
+        strictInstructions: AgentBehaviorController.generateAgentInstructions(defaultGuidance)
       };
     }
 
@@ -79,14 +91,26 @@ export class WorkflowGuard {
     const currentStatus = await this.analyzeCurrentStatusAdvanced(specifyPath, targetPhase);
     
     const canProceed = this.evaluateGateAdvanced(currentStatus, gate);
+    const blockingReasons = canProceed ? [] : this.generateBlockingReasonsAdvanced(currentStatus, gate);
     
+    // NEW: Generate strict agent behavior control
+    const agentGuidance = AgentBehaviorController.generateStrictGuidance(
+      targetPhase,
+      currentStatus.qualityScore,
+      blockingReasons
+    );
+    
+    const strictInstructions = AgentBehaviorController.generateAgentInstructions(agentGuidance);
+
     return {
       currentPhase: targetPhase,
       canProceed,
-      blockingReasons: canProceed ? [] : this.generateBlockingReasonsAdvanced(currentStatus, gate),
+      blockingReasons,
       qualityScore: currentStatus.qualityScore,
       iterationCount: currentStatus.iterationCount,
-      recommendations: currentStatus.recommendations
+      recommendations: currentStatus.recommendations,
+      agentGuidance,
+      strictInstructions
     };
   }
 
