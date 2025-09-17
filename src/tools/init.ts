@@ -1,19 +1,26 @@
-import { z } from 'zod';
-import type { SDDTool, ToolResult } from '../types/index.js';
-import { CommonVerifier } from '../verification/common.js';
-import { ResourceManager } from '../resources/manager.js';
+import { z } from "zod";
+import type { SDDTool, ToolResult } from "../types/index.js";
+import { CommonVerifier } from "../verification/common.js";
+import { ResourceManager } from "../resources/manager.js";
 
 const initInputSchema = z.object({
-  projectName: z.string().describe('Name of the project'),
-  description: z.string().optional().describe('Initial project description'),
-  domain: z.string().optional().describe('Project domain or industry'),
-  goals: z.array(z.string()).optional().describe('Project goals and objectives'),
-  constraints: z.array(z.string()).optional().describe('Known constraints or limitations')
+  projectName: z.string().describe("Name of the project"),
+  description: z.string().optional().describe("Initial project description"),
+  domain: z.string().optional().describe("Project domain or industry"),
+  goals: z
+    .array(z.string())
+    .optional()
+    .describe("Project goals and objectives"),
+  constraints: z
+    .array(z.string())
+    .optional()
+    .describe("Known constraints or limitations"),
 });
 
 export class InitTool implements SDDTool {
-  name = 'initialize_project';
-  description = 'Initialize a new project with requirements gathering and setup';
+  name = "initialize_project";
+  description =
+    "Initialize a new project with requirements gathering and setup";
   inputSchema = initInputSchema;
 
   private verifier: CommonVerifier;
@@ -32,72 +39,78 @@ export class InitTool implements SDDTool {
     const projectInfo = {
       projectId,
       projectName: input.projectName,
-      description: input.description || '',
-      domain: input.domain || '',
+      description: input.description || "",
+      domain: input.domain || "",
       goals: input.goals || [],
       constraints: input.constraints || [],
       createdAt: new Date().toISOString(),
       workflow: {
-        currentStage: 'init',
+        currentStage: "init",
         completedStages: [],
-        nextStage: 'spec'
-      }
+        nextStage: "spec",
+      },
     };
 
     // Create project metadata file
     const metadataContent = JSON.stringify(projectInfo, null, 2);
     await this.resourceManager.createResource(
       projectId,
-      'metadata.json',
+      "metadata.json",
       metadataContent,
-      { stage: 'init' }
+      { stage: "init" }
     );
 
     // Create initial README
     const readmeContent = this.generateReadme(projectInfo);
     await this.resourceManager.createResource(
       projectId,
-      'README.md',
+      "README.md",
       readmeContent,
-      { stage: 'init' }
+      { stage: "init" }
     );
 
     // Verify the initialization
     const verificationResult = await this.verifier.verify(readmeContent);
-    
+
     // Create initialization report
-    const initReport = this.generateInitReport(projectInfo, verificationResult.suggestions);
+    const initReport = this.generateInitReport(
+      projectInfo,
+      verificationResult.suggestions
+    );
     await this.resourceManager.createResource(
       projectId,
-      'init/report.md',
+      "init/report.md",
       initReport,
-      { stage: 'init', verified: verificationResult.isValid }
+      { stage: "init", verified: verificationResult.isValid }
     );
 
     return {
       content: [
         {
-          type: 'text',
-          text: `Project "${input.projectName}" initialized successfully`
+          type: "text",
+          text: `Project "${input.projectName}" initialized successfully`,
         },
         {
-          type: 'text',
-          text: `PROJECT_ID: ${projectId}`
+          type: "text",
+          text: `PROJECT_ID: ${projectId}`,
         },
         {
-          type: 'resource',
-          uri: `specify://${projectId}/metadata.json`
+          type: "resource",
+          uri: `specify://${projectId}/metadata.json`,
         },
         {
-          type: 'resource',
-          uri: `specify://${projectId}/README.md`
-        }
-      ]
+          type: "resource",
+          uri: `specify://${projectId}/README.md`,
+        },
+      ],
     };
   }
 
   private generateProjectId(projectName: string): string {
-    const sanitized = projectName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30);
+    const sanitized = projectName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .slice(0, 30);
     return sanitized;
   }
 
@@ -105,16 +118,16 @@ export class InitTool implements SDDTool {
     return `# ${projectInfo.projectName}
 
 ## Project Overview
-${projectInfo.description || 'No description provided.'}
+${projectInfo.description || "No description provided."}
 
 ## Domain
-${projectInfo.domain || 'Not specified'}
+${projectInfo.domain || "Not specified"}
 
 ## Goals
-${projectInfo.goals.length > 0 ? projectInfo.goals.map((g: string) => `- ${g}`).join('\n') : '- No goals specified'}
+${projectInfo.goals.length > 0 ? projectInfo.goals.map((g: string) => `- ${g}`).join("\n") : "- No goals specified"}
 
 ## Constraints
-${projectInfo.constraints.length > 0 ? projectInfo.constraints.map((c: string) => `- ${c}`).join('\n') : '- No constraints specified'}
+${projectInfo.constraints.length > 0 ? projectInfo.constraints.map((c: string) => `- ${c}`).join("\n") : "- No constraints specified"}
 
 ## Workflow Status
 - Current Stage: ${projectInfo.workflow.currentStage}
@@ -147,19 +160,19 @@ ${projectInfo.constraints.length > 0 ? projectInfo.constraints.map((c: string) =
 
 ## Collected Information
 ### Description
-${projectInfo.description || 'Not provided'}
+${projectInfo.description || "Not provided"}
 
 ### Domain
-${projectInfo.domain || 'Not specified'}
+${projectInfo.domain || "Not specified"}
 
 ### Goals
-${projectInfo.goals.length > 0 ? projectInfo.goals.map((g: string) => `1. ${g}`).join('\n') : 'No goals specified'}
+${projectInfo.goals.length > 0 ? projectInfo.goals.map((g: string) => `1. ${g}`).join("\n") : "No goals specified"}
 
 ### Constraints
-${projectInfo.constraints.length > 0 ? projectInfo.constraints.map((c: string) => `1. ${c}`).join('\n') : 'No constraints specified'}
+${projectInfo.constraints.length > 0 ? projectInfo.constraints.map((c: string) => `1. ${c}`).join("\n") : "No constraints specified"}
 
 ## Verification Suggestions
-${suggestions.length > 0 ? suggestions.map(s => `- ${s}`).join('\n') : 'No suggestions'}
+${suggestions.length > 0 ? suggestions.map((s) => `- ${s}`).join("\n") : "No suggestions"}
 
 ## Next Steps
 1. Review and refine project information if needed

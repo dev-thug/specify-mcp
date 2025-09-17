@@ -1,12 +1,14 @@
-import { z } from 'zod';
-import type { SDDTool, ToolResult } from '../types/index.js';
-import { ResourceManager } from '../resources/manager.js';
+import { z } from "zod";
+import type { SDDTool, ToolResult } from "../types/index.js";
+import { ResourceManager } from "../resources/manager.js";
 
 const implementInputSchema = z.object({
-  projectId: z.string().describe('Project ID'),
-  taskId: z.string().describe('Task ID to implement'),
-  testingFramework: z.string().optional().describe('Testing framework to use'),
-  tddApproach: z.enum(['red-green-refactor', 'outside-in', 'inside-out']).optional()
+  projectId: z.string().describe("Project ID"),
+  taskId: z.string().describe("Task ID to implement"),
+  testingFramework: z.string().optional().describe("Testing framework to use"),
+  tddApproach: z
+    .enum(["red-green-refactor", "outside-in", "inside-out"])
+    .optional(),
 });
 
 interface TestCase {
@@ -14,12 +16,12 @@ interface TestCase {
   description: string;
   input: string;
   expectedOutput: string;
-  testType: 'unit' | 'integration' | 'e2e';
+  testType: "unit" | "integration" | "e2e";
 }
 
 export class ImplementTool implements SDDTool {
-  name = 'generate_tests';
-  description = 'Generate TDD tests and implementation guides for development';
+  name = "generate_tests";
+  description = "Generate TDD tests and implementation guides for development";
   inputSchema = implementInputSchema;
 
   private resourceManager: ResourceManager;
@@ -30,23 +32,26 @@ export class ImplementTool implements SDDTool {
 
   async handler(params: unknown): Promise<ToolResult> {
     const input = implementInputSchema.parse(params);
-    
+
     // Read project and task information
-    const projectData = await this.resourceManager.readResource(input.projectId, 'metadata.json');
+    const projectData = await this.resourceManager.readResource(
+      input.projectId,
+      "metadata.json"
+    );
     const project = JSON.parse(projectData.content);
-    
+
     // Read technical plan for tech stack info
     let techStack: any = {};
     try {
       const planData = await this.resourceManager.readResource(
         input.projectId,
-        'plan/technical-plan.md'
+        "plan/technical-plan.md"
       );
       techStack = this.extractTechStack(planData.content);
     } catch {}
 
     // Read task details
-    let taskDetails = '';
+    let taskDetails = "";
     try {
       const taskData = await this.resourceManager.readResource(
         input.projectId,
@@ -57,129 +62,146 @@ export class ImplementTool implements SDDTool {
       return {
         content: [
           {
-            type: 'text',
-            text: `Task ${input.taskId} not found. Please run tasks stage first.`
-          }
-        ]
+            type: "text",
+            text: `Task ${input.taskId} not found. Please run tasks stage first.`,
+          },
+        ],
       };
     }
 
     // Determine testing framework
-    const testingFramework = input.testingFramework || 
-                            techStack.testing?.[0] || 
-                            'jest';
+    const testingFramework =
+      input.testingFramework || techStack.testing?.[0] || "jest";
 
-    const tddApproach = input.tddApproach || 'red-green-refactor';
+    const tddApproach = input.tddApproach || "red-green-refactor";
 
     // Generate TDD artifacts
-    const tddPlan = this.generateTDDPlan(input.taskId, taskDetails, tddApproach);
+    const tddPlan = this.generateTDDPlan(
+      input.taskId,
+      taskDetails,
+      tddApproach
+    );
     const testCases = this.generateTestCases(taskDetails);
-    const testCode = this.generateTestCode(testCases, testingFramework, techStack);
+    const testCode = this.generateTestCode(
+      testCases,
+      testingFramework,
+      techStack
+    );
     const pseudoCode = this.generatePseudoCode(taskDetails, testCases);
-    const methodology = this.generateTDDMethodology(tddApproach, testingFramework);
+    const methodology = this.generateTDDMethodology(
+      tddApproach,
+      testingFramework
+    );
 
     // Save TDD artifacts
     const taskPath = `implement/${input.taskId}`;
-    
+
     await this.resourceManager.createResource(
       input.projectId,
       `${taskPath}/tdd-plan.md`,
       tddPlan,
-      { stage: 'implement', taskId: input.taskId }
+      { stage: "implement", taskId: input.taskId }
     );
 
     await this.resourceManager.createResource(
       input.projectId,
       `${taskPath}/test.${this.getTestFileExtension(testingFramework)}`,
       testCode,
-      { stage: 'implement', taskId: input.taskId, type: 'test' }
+      { stage: "implement", taskId: input.taskId, type: "test" }
     );
 
     await this.resourceManager.createResource(
       input.projectId,
       `${taskPath}/pseudocode.md`,
       pseudoCode,
-      { stage: 'implement', taskId: input.taskId, type: 'pseudocode' }
+      { stage: "implement", taskId: input.taskId, type: "pseudocode" }
     );
 
     await this.resourceManager.createResource(
       input.projectId,
       `${taskPath}/methodology.md`,
       methodology,
-      { stage: 'implement', taskId: input.taskId, type: 'methodology' }
+      { stage: "implement", taskId: input.taskId, type: "methodology" }
     );
 
     // Generate implementation checklist
-    const checklist = this.generateImplementationChecklist(input.taskId, tddApproach);
+    const checklist = this.generateImplementationChecklist(
+      input.taskId,
+      tddApproach
+    );
     await this.resourceManager.createResource(
       input.projectId,
       `${taskPath}/checklist.md`,
       checklist,
-      { stage: 'implement', taskId: input.taskId }
+      { stage: "implement", taskId: input.taskId }
     );
 
     // Update project workflow
-    if (!project.workflow.completedStages.includes('implement')) {
-      project.workflow.completedStages.push('implement');
+    if (!project.workflow.completedStages.includes("implement")) {
+      project.workflow.completedStages.push("implement");
     }
-    project.workflow.currentStage = 'implement';
-    
+    project.workflow.currentStage = "implement";
+
     await this.resourceManager.updateResource(
       input.projectId,
-      'metadata.json',
+      "metadata.json",
       JSON.stringify(project, null, 2)
     );
 
     return {
       content: [
         {
-          type: 'text',
-          text: `TDD implementation prepared for task ${input.taskId}`
+          type: "text",
+          text: `TDD implementation prepared for task ${input.taskId}`,
         },
         {
-          type: 'resource',
-          uri: `specify://${input.projectId}/${taskPath}/tdd-plan.md`
+          type: "resource",
+          uri: `specify://${input.projectId}/${taskPath}/tdd-plan.md`,
         },
         {
-          type: 'resource',
-          uri: `specify://${input.projectId}/${taskPath}/test.${this.getTestFileExtension(testingFramework)}`
+          type: "resource",
+          uri: `specify://${input.projectId}/${taskPath}/test.${this.getTestFileExtension(testingFramework)}`,
         },
         {
-          type: 'text',
-          text: `Testing framework: ${testingFramework}, Approach: ${tddApproach}`
-        }
-      ]
+          type: "text",
+          text: `Testing framework: ${testingFramework}, Approach: ${tddApproach}`,
+        },
+      ],
     };
   }
 
   private extractTechStack(planContent: string): any {
     // Simple extraction - in real implementation, would parse more carefully
     const techStack: any = {};
-    
-    if (planContent.includes('Jest')) {
-      techStack.testing = ['jest'];
+
+    if (planContent.includes("Jest")) {
+      techStack.testing = ["jest"];
     }
-    if (planContent.includes('TypeScript')) {
-      techStack.language = 'typescript';
+    if (planContent.includes("TypeScript")) {
+      techStack.language = "typescript";
     }
-    if (planContent.includes('React')) {
-      techStack.frontend = ['react'];
+    if (planContent.includes("React")) {
+      techStack.frontend = ["react"];
     }
-    if (planContent.includes('Node.js')) {
-      techStack.backend = ['nodejs'];
+    if (planContent.includes("Node.js")) {
+      techStack.backend = ["nodejs"];
     }
 
     return techStack;
   }
 
-  private generateTDDPlan(taskId: string, _taskDetails: string, approach: string): string {
+  private generateTDDPlan(
+    taskId: string,
+    _taskDetails: string,
+    approach: string
+  ): string {
     return `# TDD Implementation Plan for ${taskId}
 
 ## Overview
 This document outlines the Test-Driven Development approach for implementing task ${taskId}.
 
 ## TDD Approach
-**${approach.replace(/-/g, ' ').toUpperCase()}**
+**${approach.replace(/-/g, " ").toUpperCase()}**
 
 ${this.getApproachDescription(approach)}
 
@@ -247,78 +269,78 @@ ${this.getApproachDescription(approach)}
 
   private getApproachDescription(approach: string): string {
     const descriptions: Record<string, string> = {
-      'red-green-refactor': `The classic TDD cycle:
+      "red-green-refactor": `The classic TDD cycle:
 - **Red**: Write a failing test that defines desired functionality
 - **Green**: Write minimal code to make the test pass
 - **Refactor**: Improve code structure while keeping tests green`,
-      
-      'outside-in': `Start from the user interface and work towards the core:
+
+      "outside-in": `Start from the user interface and work towards the core:
 - Begin with acceptance tests
 - Move to integration tests
 - Finally implement unit tests
 - Best for user-facing features`,
-      
-      'inside-out': `Start from the core logic and build outwards:
+
+      "inside-out": `Start from the core logic and build outwards:
 - Begin with unit tests for core logic
 - Add integration tests for module interactions
 - Finally add end-to-end tests
-- Best for algorithmic or data-heavy features`
+- Best for algorithmic or data-heavy features`,
     };
 
-    return descriptions[approach] || descriptions['red-green-refactor'];
+    return descriptions[approach] || descriptions["red-green-refactor"];
   }
 
   private generateTestCases(_taskDetails: string): TestCase[] {
     // Generate test cases based on task details
     // This is simplified - real implementation would parse task details more thoroughly
-    
+
     const testCases: TestCase[] = [
       {
-        name: 'should handle valid input correctly',
-        description: 'Test the happy path with valid input',
-        input: '{ valid: true }',
-        expectedOutput: '{ success: true }',
-        testType: 'unit'
+        name: "should handle valid input correctly",
+        description: "Test the happy path with valid input",
+        input: "{ valid: true }",
+        expectedOutput: "{ success: true }",
+        testType: "unit",
       },
       {
-        name: 'should handle invalid input gracefully',
-        description: 'Test error handling for invalid input',
-        input: '{ valid: false }',
+        name: "should handle invalid input gracefully",
+        description: "Test error handling for invalid input",
+        input: "{ valid: false }",
         expectedOutput: '{ error: "Invalid input" }',
-        testType: 'unit'
+        testType: "unit",
       },
       {
-        name: 'should handle edge cases',
-        description: 'Test boundary conditions and edge cases',
-        input: 'null',
+        name: "should handle edge cases",
+        description: "Test boundary conditions and edge cases",
+        input: "null",
         expectedOutput: '{ error: "Input required" }',
-        testType: 'unit'
+        testType: "unit",
       },
       {
-        name: 'should integrate with external services',
-        description: 'Test integration points',
+        name: "should integrate with external services",
+        description: "Test integration points",
         input: '{ action: "fetch" }',
-        expectedOutput: '{ data: [...] }',
-        testType: 'integration'
-      }
+        expectedOutput: "{ data: [...] }",
+        testType: "integration",
+      },
     ];
 
     return testCases;
   }
 
   private generateTestCode(
-    testCases: TestCase[], 
-    framework: string, 
+    testCases: TestCase[],
+    framework: string,
     techStack: any
   ): string {
-    const isTypeScript = techStack.language === 'typescript';
+    const isTypeScript = techStack.language === "typescript";
     // const fileExt = isTypeScript ? 'ts' : 'js';
 
-    if (framework.toLowerCase().includes('jest')) {
+    if (framework.toLowerCase().includes("jest")) {
       return this.generateJestTests(testCases, isTypeScript);
-    } else if (framework.toLowerCase().includes('mocha')) {
+    } else if (framework.toLowerCase().includes("mocha")) {
       return this.generateMochaTests(testCases, isTypeScript);
-    } else if (framework.toLowerCase().includes('vitest')) {
+    } else if (framework.toLowerCase().includes("vitest")) {
       return this.generateVitestTests(testCases, isTypeScript);
     }
 
@@ -326,7 +348,10 @@ ${this.getApproachDescription(approach)}
     return this.generateJestTests(testCases, isTypeScript);
   }
 
-  private generateJestTests(testCases: TestCase[], isTypeScript: boolean): string {
+  private generateJestTests(
+    testCases: TestCase[],
+    isTypeScript: boolean
+  ): string {
     const imports = isTypeScript
       ? `import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 // Import the module to test (update path as needed)
@@ -349,7 +374,10 @@ describe('Task Implementation Tests', () => {
 
   // Unit Tests
   describe('Unit Tests', () => {
-${testCases.filter(tc => tc.testType === 'unit').map(tc => `
+${testCases
+  .filter((tc) => tc.testType === "unit")
+  .map(
+    (tc) => `
     it('${tc.name}', () => {
       // Arrange
       const input = ${tc.input};
@@ -363,12 +391,17 @@ ${testCases.filter(tc => tc.testType === 'unit').map(tc => `
       
       // TODO: Implement this test
       expect(true).toBe(false); // This should fail initially (RED phase)
-    });`).join('\n')}
+    });`
+  )
+  .join("\n")}
   });
 
   // Integration Tests
   describe('Integration Tests', () => {
-${testCases.filter(tc => tc.testType === 'integration').map(tc => `
+${testCases
+  .filter((tc) => tc.testType === "integration")
+  .map(
+    (tc) => `
     it('${tc.name}', async () => {
       // Arrange
       const input = ${tc.input};
@@ -382,7 +415,9 @@ ${testCases.filter(tc => tc.testType === 'integration').map(tc => `
       
       // TODO: Implement this test
       expect(true).toBe(false); // This should fail initially (RED phase)
-    });`).join('\n')}
+    });`
+  )
+  .join("\n")}
   });
 
   // Edge Cases
@@ -438,7 +473,10 @@ describe('Performance Tests', () => {
 `;
   }
 
-  private generateMochaTests(_testCases: TestCase[], _isTypeScript: boolean): string {
+  private generateMochaTests(
+    _testCases: TestCase[],
+    _isTypeScript: boolean
+  ): string {
     // Similar to Jest but with Mocha syntax
     return `// Mocha test implementation
 const { expect } = require('chai');
@@ -448,7 +486,10 @@ describe('Task Implementation Tests', function() {
 });`;
   }
 
-  private generateVitestTests(_testCases: TestCase[], _isTypeScript: boolean): string {
+  private generateVitestTests(
+    _testCases: TestCase[],
+    _isTypeScript: boolean
+  ): string {
     // Similar to Jest but with Vitest imports
     return `import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
@@ -457,7 +498,10 @@ describe('Task Implementation Tests', () => {
 });`;
   }
 
-  private generatePseudoCode(_taskDetails: string, _testCases: TestCase[]): string {
+  private generatePseudoCode(
+    _taskDetails: string,
+    _testCases: TestCase[]
+  ): string {
     return `# Pseudocode Implementation Guide
 
 ## Overview
@@ -636,7 +680,7 @@ OUTPUT {
     return `# TDD Methodology Guide
 
 ## Framework: ${framework}
-## Approach: ${approach.replace(/-/g, ' ').toUpperCase()}
+## Approach: ${approach.replace(/-/g, " ").toUpperCase()}
 
 ## Development Workflow
 
@@ -915,7 +959,10 @@ node --inspect-brk node_modules/.bin/${framework}
 `;
   }
 
-  private generateImplementationChecklist(taskId: string, _approach: string): string {
+  private generateImplementationChecklist(
+    taskId: string,
+    _approach: string
+  ): string {
     return `# Implementation Checklist for ${taskId}
 
 ## Pre-Implementation
@@ -1019,13 +1066,13 @@ node --inspect-brk node_modules/.bin/${framework}
   }
 
   private getTestFileExtension(framework: string): string {
-    if (framework.toLowerCase().includes('jest')) {
-      return 'test.ts';
-    } else if (framework.toLowerCase().includes('mocha')) {
-      return 'spec.ts';
-    } else if (framework.toLowerCase().includes('vitest')) {
-      return 'test.ts';
+    if (framework.toLowerCase().includes("jest")) {
+      return "test.ts";
+    } else if (framework.toLowerCase().includes("mocha")) {
+      return "spec.ts";
+    } else if (framework.toLowerCase().includes("vitest")) {
+      return "test.ts";
     }
-    return 'test.ts';
+    return "test.ts";
   }
 }

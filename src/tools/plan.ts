@@ -1,24 +1,31 @@
-import { z } from 'zod';
-import type { SDDTool, ToolResult } from '../types/index.js';
-import { CommonVerifier } from '../verification/common.js';
-import { ResourceManager } from '../resources/manager.js';
+import { z } from "zod";
+import type { SDDTool, ToolResult } from "../types/index.js";
+import { CommonVerifier } from "../verification/common.js";
+import { ResourceManager } from "../resources/manager.js";
 
 const planInputSchema = z.object({
-  projectId: z.string().describe('Project ID'),
-  techStack: z.object({
-    frontend: z.array(z.string()).optional(),
-    backend: z.array(z.string()).optional(),
-    database: z.array(z.string()).optional(),
-    infrastructure: z.array(z.string()).optional(),
-    testing: z.array(z.string()).optional()
-  }).optional().describe('Proposed technology stack'),
-  architecture: z.string().optional().describe('Architecture pattern (e.g., microservices, monolithic)'),
-  designSystem: z.string().optional().describe('Design system or UI framework')
+  projectId: z.string().describe("Project ID"),
+  techStack: z
+    .object({
+      frontend: z.array(z.string()).optional(),
+      backend: z.array(z.string()).optional(),
+      database: z.array(z.string()).optional(),
+      infrastructure: z.array(z.string()).optional(),
+      testing: z.array(z.string()).optional(),
+    })
+    .optional()
+    .describe("Proposed technology stack"),
+  architecture: z
+    .string()
+    .optional()
+    .describe("Architecture pattern (e.g., microservices, monolithic)"),
+  designSystem: z.string().optional().describe("Design system or UI framework"),
 });
 
 export class PlanTool implements SDDTool {
-  name = 'create_technical_plan';
-  description = 'Create technical architecture plan with technology stack and design decisions';
+  name = "create_technical_plan";
+  description =
+    "Create technical architecture plan with technology stack and design decisions";
   inputSchema = planInputSchema;
 
   private verifier: CommonVerifier;
@@ -31,70 +38,73 @@ export class PlanTool implements SDDTool {
 
   async handler(params: unknown): Promise<ToolResult> {
     const input = planInputSchema.parse(params);
-    
+
     // Read project and specification
-    const projectData = await this.resourceManager.readResource(input.projectId, 'metadata.json');
+    const projectData = await this.resourceManager.readResource(
+      input.projectId,
+      "metadata.json"
+    );
     const project = JSON.parse(projectData.content);
-    
+
     // Read specification if available
     try {
       await this.resourceManager.readResource(
-        input.projectId, 
-        'spec/specification.md'
+        input.projectId,
+        "spec/specification.md"
       );
     } catch {
       // Specification not available yet
     }
 
     // Generate technical plan
-    const plan = await this.generateTechnicalPlan(project, '', input);
-    
+    const plan = await this.generateTechnicalPlan(project, "", input);
+
     // Verify plan for consistency and feasibility
     const verificationResult = await this.verifyPlan(plan);
-    
+
     // Save plan document
     await this.resourceManager.createResource(
       input.projectId,
-      'plan/technical-plan.md',
+      "plan/technical-plan.md",
       plan,
-      { stage: 'plan', verified: verificationResult.isValid }
+      { stage: "plan", verified: verificationResult.isValid }
     );
 
     // Create architecture decision records (ADRs)
     const adr = this.generateADR(input);
     await this.resourceManager.createResource(
       input.projectId,
-      'plan/adr-001-tech-stack.md',
+      "plan/adr-001-tech-stack.md",
       adr,
-      { stage: 'plan', type: 'adr' }
+      { stage: "plan", type: "adr" }
     );
 
     // Update project workflow
-    project.workflow.completedStages.push('plan');
-    project.workflow.currentStage = 'plan';
-    project.workflow.nextStage = 'tasks';
-    
+    project.workflow.completedStages.push("plan");
+    project.workflow.currentStage = "plan";
+    project.workflow.nextStage = "tasks";
+
     await this.resourceManager.updateResource(
       input.projectId,
-      'metadata.json',
+      "metadata.json",
       JSON.stringify(project, null, 2)
     );
 
     return {
       content: [
         {
-          type: 'text',
-          text: `Technical plan created for project ${input.projectId}`
+          type: "text",
+          text: `Technical plan created for project ${input.projectId}`,
         },
         {
-          type: 'resource',
-          uri: `specify://${input.projectId}/plan/technical-plan.md`
+          type: "resource",
+          uri: `specify://${input.projectId}/plan/technical-plan.md`,
         },
         {
-          type: 'resource',
-          uri: `specify://${input.projectId}/plan/adr-001-tech-stack.md`
-        }
-      ]
+          type: "resource",
+          uri: `specify://${input.projectId}/plan/adr-001-tech-stack.md`,
+        },
+      ],
     };
   }
 
@@ -104,15 +114,15 @@ export class PlanTool implements SDDTool {
     input: z.infer<typeof planInputSchema>
   ): Promise<string> {
     const techStack = input.techStack || this.getDefaultTechStack();
-    const architecture = input.architecture || 'modular monolith';
-    const designSystem = input.designSystem || 'custom';
+    const architecture = input.architecture || "modular monolith";
+    const designSystem = input.designSystem || "custom";
 
     return `# Technical Plan
 ## ${project.projectName}
 
 ### Document Information
 - **Version**: 1.0.0
-- **Date**: ${new Date().toISOString().split('T')[0]}
+- **Date**: ${new Date().toISOString().split("T")[0]}
 - **Project ID**: ${project.projectId}
 - **Based on**: Specification v1.0.0
 
@@ -133,19 +143,19 @@ ${this.getArchitectureDescription(architecture)}
 ## 2. Technology Stack
 
 ### Frontend
-${techStack.frontend?.map((tech: string) => `- ${tech}`).join('\n') || '- Not applicable'}
+${techStack.frontend?.map((tech: string) => `- ${tech}`).join("\n") || "- Not applicable"}
 
 ### Backend
-${techStack.backend?.map((tech: string) => `- ${tech}`).join('\n') || '- Node.js\n- TypeScript'}
+${techStack.backend?.map((tech: string) => `- ${tech}`).join("\n") || "- Node.js\n- TypeScript"}
 
 ### Database
-${techStack.database?.map((tech: string) => `- ${tech}`).join('\n') || '- PostgreSQL'}
+${techStack.database?.map((tech: string) => `- ${tech}`).join("\n") || "- PostgreSQL"}
 
 ### Infrastructure
-${techStack.infrastructure?.map((tech: string) => `- ${tech}`).join('\n') || '- Docker\n- Cloud-native'}
+${techStack.infrastructure?.map((tech: string) => `- ${tech}`).join("\n") || "- Docker\n- Cloud-native"}
 
 ### Testing Tools
-${techStack.testing?.map((tech: string) => `- ${tech}`).join('\n') || '- Jest\n- Testing Library'}
+${techStack.testing?.map((tech: string) => `- ${tech}`).join("\n") || "- Jest\n- Testing Library"}
 
 ## 3. Design System
 **${designSystem}**
@@ -329,28 +339,36 @@ ${techStack.testing?.map((tech: string) => `- ${tech}`).join('\n') || '- Jest\n-
 
   private getDefaultTechStack(): any {
     return {
-      frontend: ['React', 'TypeScript', 'Tailwind CSS'],
-      backend: ['Node.js', 'Express', 'TypeScript'],
-      database: ['PostgreSQL', 'Redis'],
-      infrastructure: ['Docker', 'Kubernetes', 'AWS/GCP'],
-      testing: ['Jest', 'React Testing Library', 'Cypress']
+      frontend: ["React", "TypeScript", "Tailwind CSS"],
+      backend: ["Node.js", "Express", "TypeScript"],
+      database: ["PostgreSQL", "Redis"],
+      infrastructure: ["Docker", "Kubernetes", "AWS/GCP"],
+      testing: ["Jest", "React Testing Library", "Cypress"],
     };
   }
 
   private getArchitectureDescription(architecture: string): string {
     const descriptions: Record<string, string> = {
-      'microservices': 'Distributed architecture with independently deployable services, each owning its data and business logic.',
-      'monolithic': 'Single deployable unit containing all application components, suitable for smaller teams and simpler deployments.',
-      'modular monolith': 'Monolithic deployment with clear module boundaries, preparing for potential future decomposition.',
-      'serverless': 'Event-driven architecture using cloud functions, optimal for variable workloads and rapid scaling.',
-      'event-driven': 'Asynchronous communication between components using events, enabling loose coupling and scalability.'
+      microservices:
+        "Distributed architecture with independently deployable services, each owning its data and business logic.",
+      monolithic:
+        "Single deployable unit containing all application components, suitable for smaller teams and simpler deployments.",
+      "modular monolith":
+        "Monolithic deployment with clear module boundaries, preparing for potential future decomposition.",
+      serverless:
+        "Event-driven architecture using cloud functions, optimal for variable workloads and rapid scaling.",
+      "event-driven":
+        "Asynchronous communication between components using events, enabling loose coupling and scalability.",
     };
-    
-    return descriptions[architecture] || 'Custom architecture pattern tailored to project requirements.';
+
+    return (
+      descriptions[architecture] ||
+      "Custom architecture pattern tailored to project requirements."
+    );
   }
 
   private generateADR(input: z.infer<typeof planInputSchema>): string {
-    const date = new Date().toISOString().split('T')[0];
+    const date = new Date().toISOString().split("T")[0];
     const techStack = input.techStack || this.getDefaultTechStack();
 
     return `# ADR-001: Technology Stack Selection
@@ -368,16 +386,16 @@ We need to select a technology stack that balances developer productivity, perfo
 We will use the following technology stack:
 
 ### Frontend
-${techStack.frontend?.map((tech: string) => `- **${tech}**: Selected for its ecosystem, performance, and developer experience`).join('\n') || '- Not applicable'}
+${techStack.frontend?.map((tech: string) => `- **${tech}**: Selected for its ecosystem, performance, and developer experience`).join("\n") || "- Not applicable"}
 
 ### Backend
-${techStack.backend?.map((tech: string) => `- **${tech}**: Chosen for type safety and robust ecosystem`).join('\n') || '- **Node.js with TypeScript**: For consistency with frontend and type safety'}
+${techStack.backend?.map((tech: string) => `- **${tech}**: Chosen for type safety and robust ecosystem`).join("\n") || "- **Node.js with TypeScript**: For consistency with frontend and type safety"}
 
 ### Database
-${techStack.database?.map((tech: string) => `- **${tech}**: Reliable, scalable, and well-supported`).join('\n') || '- **PostgreSQL**: ACID compliance and rich feature set'}
+${techStack.database?.map((tech: string) => `- **${tech}**: Reliable, scalable, and well-supported`).join("\n") || "- **PostgreSQL**: ACID compliance and rich feature set"}
 
 ### Infrastructure
-${techStack.infrastructure?.map((tech: string) => `- **${tech}**: Industry standard for containerization and orchestration`).join('\n') || '- **Docker & Kubernetes**: For scalability and deployment flexibility'}
+${techStack.infrastructure?.map((tech: string) => `- **${tech}**: Industry standard for containerization and orchestration`).join("\n") || "- **Docker & Kubernetes**: For scalability and deployment flexibility"}
 
 ## Consequences
 
@@ -416,15 +434,19 @@ ${techStack.infrastructure?.map((tech: string) => `- **${tech}**: Industry stand
     const suggestions: string[] = [];
 
     // Check for technology compatibility
-    if (plan.includes('React') && plan.includes('Angular')) {
-      issues.push('Multiple competing frontend frameworks detected');
+    if (plan.includes("React") && plan.includes("Angular")) {
+      issues.push("Multiple competing frontend frameworks detected");
     }
 
     // Check for missing critical sections
     const requiredSections = [
-      'Architecture', 'Technology Stack', 'Security', 'Performance', 'Deployment'
+      "Architecture",
+      "Technology Stack",
+      "Security",
+      "Performance",
+      "Deployment",
     ];
-    
+
     for (const section of requiredSections) {
       if (!plan.includes(section)) {
         issues.push(`Missing critical section: ${section}`);
@@ -437,16 +459,16 @@ ${techStack.infrastructure?.map((tech: string) => `- **${tech}**: Industry stand
     suggestions.push(...commonVerification.suggestions);
 
     // Technology-specific suggestions
-    if (plan.includes('microservices')) {
-      suggestions.push('Consider service mesh for microservices communication');
-      suggestions.push('Plan for distributed tracing and monitoring');
+    if (plan.includes("microservices")) {
+      suggestions.push("Consider service mesh for microservices communication");
+      suggestions.push("Plan for distributed tracing and monitoring");
     }
 
     return {
       isValid: issues.length === 0,
       issues,
       suggestions,
-      confidence: Math.max(0.5, 1 - (issues.length * 0.1))
+      confidence: Math.max(0.5, 1 - issues.length * 0.1),
     };
   }
 }

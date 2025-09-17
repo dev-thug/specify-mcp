@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import type { z } from "zod";
 
 export interface TransportAdapter {
   start(): Promise<void>;
@@ -55,7 +55,7 @@ export interface SDDTool {
 
 export interface ToolResult {
   content: Array<{
-    type: 'text' | 'resource';
+    type: "text" | "resource";
     text?: string;
     uri?: string;
   }>;
@@ -69,7 +69,7 @@ export interface ElicitationRequest {
 
 export interface SamplingRequest {
   messages: Array<{
-    role: 'user' | 'assistant' | 'system';
+    role: "user" | "assistant" | "system";
     content: string;
   }>;
   modelPreferences?: {

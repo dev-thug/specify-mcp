@@ -1,11 +1,17 @@
-import { z } from 'zod';
-import type { SDDTool, ToolResult } from '../types/index.js';
-import { ResourceManager } from '../resources/manager.js';
+import { z } from "zod";
+import type { SDDTool, ToolResult } from "../types/index.js";
+import { ResourceManager } from "../resources/manager.js";
 
 const tasksInputSchema = z.object({
-  projectId: z.string().describe('Project ID'),
-  granularity: z.enum(['high', 'medium', 'low']).optional().describe('Task breakdown granularity'),
-  groupingStrategy: z.enum(['feature', 'layer', 'component']).optional().describe('How to group tasks')
+  projectId: z.string().describe("Project ID"),
+  granularity: z
+    .enum(["high", "medium", "low"])
+    .optional()
+    .describe("Task breakdown granularity"),
+  groupingStrategy: z
+    .enum(["feature", "layer", "component"])
+    .optional()
+    .describe("How to group tasks"),
 });
 
 interface Task {
@@ -14,7 +20,7 @@ interface Task {
   description: string;
   dependencies: string[];
   estimatedHours: number;
-  priority: 'high' | 'medium' | 'low';
+  priority: "high" | "medium" | "low";
   category: string;
   subtasks: Subtask[];
 }
@@ -28,8 +34,9 @@ interface Subtask {
 }
 
 export class TasksTool implements SDDTool {
-  name = 'breakdown_tasks';
-  description = 'Break down project into detailed tasks and create work breakdown structure';
+  name = "breakdown_tasks";
+  description =
+    "Break down project into detailed tasks and create work breakdown structure";
   inputSchema = tasksInputSchema;
 
   private resourceManager: ResourceManager;
@@ -40,76 +47,85 @@ export class TasksTool implements SDDTool {
 
   async handler(params: unknown): Promise<ToolResult> {
     const input = tasksInputSchema.parse(params);
-    
+
     // Read project, spec, and plan
-    const projectData = await this.resourceManager.readResource(input.projectId, 'metadata.json');
+    const projectData = await this.resourceManager.readResource(
+      input.projectId,
+      "metadata.json"
+    );
     const project = JSON.parse(projectData.content);
-    
-    let spec = '';
-    let plan = '';
+
+    let spec = "";
+    let plan = "";
     try {
-      const specData = await this.resourceManager.readResource(input.projectId, 'spec/specification.md');
+      const specData = await this.resourceManager.readResource(
+        input.projectId,
+        "spec/specification.md"
+      );
       spec = specData.content;
     } catch {}
-    
+
     try {
-      const planData = await this.resourceManager.readResource(input.projectId, 'plan/technical-plan.md');
+      const planData = await this.resourceManager.readResource(
+        input.projectId,
+        "plan/technical-plan.md"
+      );
       plan = planData.content;
     } catch {}
 
     // Generate task breakdown
     const tasks = await this.generateTasks(project, spec, plan, input);
-    
+
     // Create task folders and files
     await this.createTaskStructure(input.projectId, tasks);
-    
+
     // Generate WBS (Work Breakdown Structure)
     const wbs = this.generateWBS(tasks);
     await this.resourceManager.createResource(
       input.projectId,
-      'tasks/wbs.md',
+      "tasks/wbs.md",
       wbs,
-      { stage: 'tasks' }
+      { stage: "tasks" }
     );
 
     // Verify task completeness
     const verificationResult = await this.verifyTasks(tasks, spec);
-    
+
     // Create task summary
     const summary = this.generateTaskSummary(tasks, verificationResult);
     await this.resourceManager.createResource(
       input.projectId,
-      'tasks/summary.md',
+      "tasks/summary.md",
       summary,
-      { stage: 'tasks', verified: verificationResult.isValid }
+      { stage: "tasks", verified: verificationResult.isValid }
     );
 
     // Update project workflow
-    project.workflow.completedStages.push('tasks');
-    project.workflow.currentStage = 'tasks';
-    project.workflow.nextStage = 'implement';
-    
+    project.workflow.completedStages.push("tasks");
+    project.workflow.currentStage = "tasks";
+    project.workflow.nextStage = "implement";
+
     await this.resourceManager.updateResource(
       input.projectId,
-      'metadata.json',
+      "metadata.json",
       JSON.stringify(project, null, 2)
     );
 
     return {
       content: [
         {
-          type: 'text',
-          text: `Task breakdown completed: ${tasks.length} main tasks with ${tasks.reduce((sum, t) => sum + t.subtasks.length, 0)} subtasks`
+          type: "text",
+          text: `Task breakdown completed: ${tasks.length} main tasks with ${tasks.reduce((sum, t) => sum + t.subtasks.length, 0)} subtasks`,
         },
         {
-          type: 'resource',
-          uri: `specify://${input.projectId}/tasks/wbs.md`
+          type: "resource",
+          uri: `specify://${input.projectId}/tasks/wbs.md`,
         },
         {
-          type: 'resource',
-          uri: `specify://${input.projectId}/tasks/summary.md`
-        }
-      ]
+          type: "resource",
+          uri: `specify://${input.projectId}/tasks/summary.md`,
+        },
+      ],
     };
   }
 
@@ -128,284 +144,296 @@ export class TasksTool implements SDDTool {
 
     // Setup and Infrastructure Tasks
     tasks.push({
-      id: `TASK-${String(taskCounter++).padStart(3, '0')}`,
-      name: 'Project Setup and Configuration',
-      description: 'Initialize project structure, development environment, and core configuration',
+      id: `TASK-${String(taskCounter++).padStart(3, "0")}`,
+      name: "Project Setup and Configuration",
+      description:
+        "Initialize project structure, development environment, and core configuration",
       dependencies: [],
       estimatedHours: 8,
-      priority: 'high',
-      category: 'setup',
+      priority: "high",
+      category: "setup",
       subtasks: [
         {
-          id: 'SUB-001-001',
-          name: 'Initialize repository and project structure',
-          description: 'Set up version control, create directory structure, configure build tools',
+          id: "SUB-001-001",
+          name: "Initialize repository and project structure",
+          description:
+            "Set up version control, create directory structure, configure build tools",
           acceptanceCriteria: [
-            'Git repository initialized with proper .gitignore',
-            'Project structure follows architectural guidelines',
-            'Build configuration is functional',
-            'Development dependencies installed'
+            "Git repository initialized with proper .gitignore",
+            "Project structure follows architectural guidelines",
+            "Build configuration is functional",
+            "Development dependencies installed",
           ],
-          technicalNotes: 'Use the technology stack defined in the technical plan'
+          technicalNotes:
+            "Use the technology stack defined in the technical plan",
         },
         {
-          id: 'SUB-001-002',
-          name: 'Configure development environment',
-          description: 'Set up linting, formatting, and development tools',
+          id: "SUB-001-002",
+          name: "Configure development environment",
+          description: "Set up linting, formatting, and development tools",
           acceptanceCriteria: [
-            'ESLint/Prettier configured',
-            'Pre-commit hooks installed',
-            'IDE configuration shared',
-            'Docker development environment ready'
+            "ESLint/Prettier configured",
+            "Pre-commit hooks installed",
+            "IDE configuration shared",
+            "Docker development environment ready",
           ],
-          technicalNotes: 'Ensure consistency across team environments'
-        }
-      ]
+          technicalNotes: "Ensure consistency across team environments",
+        },
+      ],
     });
 
     // Core Feature Tasks
     tasks.push({
-      id: `TASK-${String(taskCounter++).padStart(3, '0')}`,
-      name: 'User Authentication System',
-      description: 'Implement secure user authentication and authorization',
-      dependencies: ['TASK-001'],
+      id: `TASK-${String(taskCounter++).padStart(3, "0")}`,
+      name: "User Authentication System",
+      description: "Implement secure user authentication and authorization",
+      dependencies: ["TASK-001"],
       estimatedHours: 24,
-      priority: 'high',
-      category: 'feature',
+      priority: "high",
+      category: "feature",
       subtasks: [
         {
-          id: 'SUB-002-001',
-          name: 'Design authentication schema',
-          description: 'Create database models and API contracts for authentication',
+          id: "SUB-002-001",
+          name: "Design authentication schema",
+          description:
+            "Create database models and API contracts for authentication",
           acceptanceCriteria: [
-            'User model defined with required fields',
-            'Session/token management designed',
-            'API endpoints documented',
-            'Security considerations addressed'
+            "User model defined with required fields",
+            "Session/token management designed",
+            "API endpoints documented",
+            "Security considerations addressed",
           ],
-          technicalNotes: 'Follow OWASP authentication guidelines'
+          technicalNotes: "Follow OWASP authentication guidelines",
         },
         {
-          id: 'SUB-002-002',
-          name: 'Implement authentication endpoints',
-          description: 'Create login, logout, register, and password reset functionality',
+          id: "SUB-002-002",
+          name: "Implement authentication endpoints",
+          description:
+            "Create login, logout, register, and password reset functionality",
           acceptanceCriteria: [
-            'Registration endpoint functional',
-            'Login/logout working correctly',
-            'Password reset flow complete',
-            'Input validation implemented'
+            "Registration endpoint functional",
+            "Login/logout working correctly",
+            "Password reset flow complete",
+            "Input validation implemented",
           ],
-          technicalNotes: 'Use bcrypt for password hashing, JWT for tokens'
+          technicalNotes: "Use bcrypt for password hashing, JWT for tokens",
         },
         {
-          id: 'SUB-002-003',
-          name: 'Add authorization middleware',
-          description: 'Implement role-based access control',
+          id: "SUB-002-003",
+          name: "Add authorization middleware",
+          description: "Implement role-based access control",
           acceptanceCriteria: [
-            'Middleware validates tokens',
-            'Role checking implemented',
-            'Protected routes secured',
-            'Error handling complete'
+            "Middleware validates tokens",
+            "Role checking implemented",
+            "Protected routes secured",
+            "Error handling complete",
           ],
-          technicalNotes: 'Implement RBAC pattern from technical plan'
-        }
-      ]
+          technicalNotes: "Implement RBAC pattern from technical plan",
+        },
+      ],
     });
 
     // Data Layer Tasks
     tasks.push({
-      id: `TASK-${String(taskCounter++).padStart(3, '0')}`,
-      name: 'Database Design and Implementation',
-      description: 'Design and implement database schema and data access layer',
-      dependencies: ['TASK-001'],
+      id: `TASK-${String(taskCounter++).padStart(3, "0")}`,
+      name: "Database Design and Implementation",
+      description: "Design and implement database schema and data access layer",
+      dependencies: ["TASK-001"],
       estimatedHours: 16,
-      priority: 'high',
-      category: 'data',
+      priority: "high",
+      category: "data",
       subtasks: [
         {
-          id: 'SUB-003-001',
-          name: 'Design database schema',
-          description: 'Create entity relationship diagrams and define data models',
+          id: "SUB-003-001",
+          name: "Design database schema",
+          description:
+            "Create entity relationship diagrams and define data models",
           acceptanceCriteria: [
-            'ERD documented',
-            'Relationships defined',
-            'Indexes planned',
-            'Migration strategy defined'
+            "ERD documented",
+            "Relationships defined",
+            "Indexes planned",
+            "Migration strategy defined",
           ],
-          technicalNotes: 'Consider normalization and performance'
+          technicalNotes: "Consider normalization and performance",
         },
         {
-          id: 'SUB-003-002',
-          name: 'Implement data access layer',
-          description: 'Create repositories and data access patterns',
+          id: "SUB-003-002",
+          name: "Implement data access layer",
+          description: "Create repositories and data access patterns",
           acceptanceCriteria: [
-            'Repository pattern implemented',
-            'CRUD operations functional',
-            'Transaction support added',
-            'Connection pooling configured'
+            "Repository pattern implemented",
+            "CRUD operations functional",
+            "Transaction support added",
+            "Connection pooling configured",
           ],
-          technicalNotes: 'Use ORM/query builder from tech stack'
-        }
-      ]
+          technicalNotes: "Use ORM/query builder from tech stack",
+        },
+      ],
     });
 
     // API Development Tasks
     tasks.push({
-      id: `TASK-${String(taskCounter++).padStart(3, '0')}`,
-      name: 'API Development',
-      description: 'Implement RESTful API endpoints for core functionality',
-      dependencies: ['TASK-002', 'TASK-003'],
+      id: `TASK-${String(taskCounter++).padStart(3, "0")}`,
+      name: "API Development",
+      description: "Implement RESTful API endpoints for core functionality",
+      dependencies: ["TASK-002", "TASK-003"],
       estimatedHours: 32,
-      priority: 'high',
-      category: 'api',
+      priority: "high",
+      category: "api",
       subtasks: [
         {
-          id: 'SUB-004-001',
-          name: 'Design API architecture',
-          description: 'Define API structure, versioning, and documentation approach',
+          id: "SUB-004-001",
+          name: "Design API architecture",
+          description:
+            "Define API structure, versioning, and documentation approach",
           acceptanceCriteria: [
-            'API specification documented (OpenAPI/Swagger)',
-            'Versioning strategy defined',
-            'Error format standardized',
-            'Rate limiting planned'
+            "API specification documented (OpenAPI/Swagger)",
+            "Versioning strategy defined",
+            "Error format standardized",
+            "Rate limiting planned",
           ],
-          technicalNotes: 'Follow RESTful best practices'
+          technicalNotes: "Follow RESTful best practices",
         },
         {
-          id: 'SUB-004-002',
-          name: 'Implement core endpoints',
-          description: 'Create CRUD endpoints for main entities',
+          id: "SUB-004-002",
+          name: "Implement core endpoints",
+          description: "Create CRUD endpoints for main entities",
           acceptanceCriteria: [
-            'All CRUD operations functional',
-            'Request validation implemented',
-            'Response formatting consistent',
-            'Error handling complete'
+            "All CRUD operations functional",
+            "Request validation implemented",
+            "Response formatting consistent",
+            "Error handling complete",
           ],
-          technicalNotes: 'Implement pagination, filtering, and sorting'
-        }
-      ]
+          technicalNotes: "Implement pagination, filtering, and sorting",
+        },
+      ],
     });
 
     // Frontend Tasks (if applicable)
-    if (plan.includes('Frontend') || plan.includes('React')) {
+    if (plan.includes("Frontend") || plan.includes("React")) {
       tasks.push({
-        id: `TASK-${String(taskCounter++).padStart(3, '0')}`,
-        name: 'Frontend Application Development',
-        description: 'Build user interface components and application flow',
-        dependencies: ['TASK-004'],
+        id: `TASK-${String(taskCounter++).padStart(3, "0")}`,
+        name: "Frontend Application Development",
+        description: "Build user interface components and application flow",
+        dependencies: ["TASK-004"],
         estimatedHours: 40,
-        priority: 'high',
-        category: 'frontend',
+        priority: "high",
+        category: "frontend",
         subtasks: [
           {
-            id: 'SUB-005-001',
-            name: 'Set up frontend framework',
-            description: 'Initialize frontend application with routing and state management',
+            id: "SUB-005-001",
+            name: "Set up frontend framework",
+            description:
+              "Initialize frontend application with routing and state management",
             acceptanceCriteria: [
-              'Framework initialized',
-              'Routing configured',
-              'State management set up',
-              'Component structure defined'
+              "Framework initialized",
+              "Routing configured",
+              "State management set up",
+              "Component structure defined",
             ],
-            technicalNotes: 'Use the frontend stack from technical plan'
+            technicalNotes: "Use the frontend stack from technical plan",
           },
           {
-            id: 'SUB-005-002',
-            name: 'Implement UI components',
-            description: 'Create reusable UI components following design system',
+            id: "SUB-005-002",
+            name: "Implement UI components",
+            description:
+              "Create reusable UI components following design system",
             acceptanceCriteria: [
-              'Component library created',
-              'Design tokens implemented',
-              'Responsive design working',
-              'Accessibility standards met'
+              "Component library created",
+              "Design tokens implemented",
+              "Responsive design working",
+              "Accessibility standards met",
             ],
-            technicalNotes: 'Follow atomic design principles'
-          }
-        ]
+            technicalNotes: "Follow atomic design principles",
+          },
+        ],
       });
     }
 
     // Testing Tasks
     tasks.push({
-      id: `TASK-${String(taskCounter++).padStart(3, '0')}`,
-      name: 'Testing Implementation',
-      description: 'Implement comprehensive testing strategy',
-      dependencies: tasks.slice(1, -1).map(t => t.id),
+      id: `TASK-${String(taskCounter++).padStart(3, "0")}`,
+      name: "Testing Implementation",
+      description: "Implement comprehensive testing strategy",
+      dependencies: tasks.slice(1, -1).map((t) => t.id),
       estimatedHours: 24,
-      priority: 'medium',
-      category: 'testing',
+      priority: "medium",
+      category: "testing",
       subtasks: [
         {
-          id: 'SUB-006-001',
-          name: 'Unit testing',
-          description: 'Write unit tests for all business logic',
+          id: "SUB-006-001",
+          name: "Unit testing",
+          description: "Write unit tests for all business logic",
           acceptanceCriteria: [
-            'Unit tests achieve 80% coverage',
-            'Critical paths fully tested',
-            'Test utilities created',
-            'Mocking strategy implemented'
+            "Unit tests achieve 80% coverage",
+            "Critical paths fully tested",
+            "Test utilities created",
+            "Mocking strategy implemented",
           ],
-          technicalNotes: 'Use testing framework from tech stack'
+          technicalNotes: "Use testing framework from tech stack",
         },
         {
-          id: 'SUB-006-002',
-          name: 'Integration testing',
-          description: 'Test component interactions and API endpoints',
+          id: "SUB-006-002",
+          name: "Integration testing",
+          description: "Test component interactions and API endpoints",
           acceptanceCriteria: [
-            'API endpoints tested',
-            'Database interactions verified',
-            'External service mocks created',
-            'Error scenarios covered'
+            "API endpoints tested",
+            "Database interactions verified",
+            "External service mocks created",
+            "Error scenarios covered",
           ],
-          technicalNotes: 'Test in isolated environment'
-        }
-      ]
+          technicalNotes: "Test in isolated environment",
+        },
+      ],
     });
 
     // Deployment Tasks
     tasks.push({
-      id: `TASK-${String(taskCounter++).padStart(3, '0')}`,
-      name: 'Deployment and DevOps',
-      description: 'Set up deployment pipeline and infrastructure',
-      dependencies: tasks.map(t => t.id),
+      id: `TASK-${String(taskCounter++).padStart(3, "0")}`,
+      name: "Deployment and DevOps",
+      description: "Set up deployment pipeline and infrastructure",
+      dependencies: tasks.map((t) => t.id),
       estimatedHours: 16,
-      priority: 'medium',
-      category: 'deployment',
+      priority: "medium",
+      category: "deployment",
       subtasks: [
         {
-          id: 'SUB-007-001',
-          name: 'Configure CI/CD pipeline',
-          description: 'Set up automated build and deployment',
+          id: "SUB-007-001",
+          name: "Configure CI/CD pipeline",
+          description: "Set up automated build and deployment",
           acceptanceCriteria: [
-            'Build pipeline configured',
-            'Automated tests running',
-            'Deployment stages defined',
-            'Rollback mechanism ready'
+            "Build pipeline configured",
+            "Automated tests running",
+            "Deployment stages defined",
+            "Rollback mechanism ready",
           ],
-          technicalNotes: 'Use GitHub Actions or similar'
+          technicalNotes: "Use GitHub Actions or similar",
         },
         {
-          id: 'SUB-007-002',
-          name: 'Production environment setup',
-          description: 'Configure production infrastructure',
+          id: "SUB-007-002",
+          name: "Production environment setup",
+          description: "Configure production infrastructure",
           acceptanceCriteria: [
-            'Production servers configured',
-            'Database provisioned',
-            'Monitoring set up',
-            'Backup strategy implemented'
+            "Production servers configured",
+            "Database provisioned",
+            "Monitoring set up",
+            "Backup strategy implemented",
           ],
-          technicalNotes: 'Follow infrastructure plan'
-        }
-      ]
+          technicalNotes: "Follow infrastructure plan",
+        },
+      ],
     });
 
     return tasks;
   }
 
-  private async createTaskStructure(projectId: string, tasks: Task[]): Promise<void> {
+  private async createTaskStructure(
+    projectId: string,
+    tasks: Task[]
+  ): Promise<void> {
     for (const task of tasks) {
       const taskPath = `tasks/${task.id}`;
-      
+
       // Create index file for task
       const indexContent = `# ${task.name}
 
@@ -417,10 +445,10 @@ ${task.description}
 - **Category**: ${task.category}
 - **Priority**: ${task.priority}
 - **Estimated Hours**: ${task.estimatedHours}
-- **Dependencies**: ${task.dependencies.length > 0 ? task.dependencies.join(', ') : 'None'}
+- **Dependencies**: ${task.dependencies.length > 0 ? task.dependencies.join(", ") : "None"}
 
 ## Subtasks
-${task.subtasks.map(st => `- [${st.id}](${st.id}.md): ${st.name}`).join('\n')}
+${task.subtasks.map((st) => `- [${st.id}](${st.id}.md): ${st.name}`).join("\n")}
 
 ## Progress Tracking
 - [ ] Design phase complete
@@ -437,7 +465,7 @@ Add any additional notes or considerations here.
         projectId,
         `${taskPath}/index.md`,
         indexContent,
-        { stage: 'tasks', taskId: task.id }
+        { stage: "tasks", taskId: task.id }
       );
 
       // Create subtask files
@@ -451,7 +479,7 @@ ${subtask.id}
 ${subtask.description}
 
 ## Acceptance Criteria
-${subtask.acceptanceCriteria.map(ac => `- [ ] ${ac}`).join('\n')}
+${subtask.acceptanceCriteria.map((ac) => `- [ ] ${ac}`).join("\n")}
 
 ## Technical Notes
 ${subtask.technicalNotes}
@@ -489,7 +517,7 @@ ${subtask.technicalNotes}
           projectId,
           `${taskPath}/${subtask.id}.md`,
           subtaskContent,
-          { stage: 'tasks', taskId: task.id, subtaskId: subtask.id }
+          { stage: "tasks", taskId: task.id, subtaskId: subtask.id }
         );
       }
     }
@@ -502,8 +530,12 @@ ${subtask.technicalNotes}
 
 \`\`\`
 Project
-${tasks.map(task => `├── ${task.id}: ${task.name}
-${task.subtasks.map(st => `│   ├── ${st.id}: ${st.name}`).join('\n')}`).join('\n')}
+${tasks
+  .map(
+    (task) => `├── ${task.id}: ${task.name}
+${task.subtasks.map((st) => `│   ├── ${st.id}: ${st.name}`).join("\n")}`
+  )
+  .join("\n")}
 \`\`\`
 
 ## Task Categories
@@ -514,13 +546,20 @@ ${this.groupTasksByCategory(tasks)}
 
 \`\`\`mermaid
 graph TD
-${tasks.map(task => {
-  if (task.dependencies.length > 0) {
-    return task.dependencies.map(dep => `    ${dep} --> ${task.id}`).join('\n');
-  }
-  return `    START --> ${task.id}`;
-}).join('\n')}
-${tasks.filter(t => t.dependencies.length === tasks.length - 1).map(t => `    ${t.id} --> END`).join('\n')}
+${tasks
+  .map((task) => {
+    if (task.dependencies.length > 0) {
+      return task.dependencies
+        .map((dep) => `    ${dep} --> ${task.id}`)
+        .join("\n");
+    }
+    return `    START --> ${task.id}`;
+  })
+  .join("\n")}
+${tasks
+  .filter((t) => t.dependencies.length === tasks.length - 1)
+  .map((t) => `    ${t.id} --> END`)
+  .join("\n")}
 \`\`\`
 
 ## Timeline Estimation
@@ -538,7 +577,10 @@ ${this.generateResourceAllocation(tasks)}
 ## Risk Assessment
 
 ### High-Risk Tasks
-${tasks.filter(t => t.priority === 'high').map(t => `- ${t.id}: ${t.name} - Critical for project success`).join('\n')}
+${tasks
+  .filter((t) => t.priority === "high")
+  .map((t) => `- ${t.id}: ${t.name} - Critical for project success`)
+  .join("\n")}
 
 ### Dependencies Bottlenecks
 ${this.identifyBottlenecks(tasks)}
@@ -555,38 +597,54 @@ ${this.identifyBottlenecks(tasks)}
   }
 
   private groupTasksByCategory(tasks: Task[]): string {
-    const categories = [...new Set(tasks.map(t => t.category))];
-    
-    return categories.map(cat => {
-      const categoryTasks = tasks.filter(t => t.category === cat);
-      return `### ${cat.charAt(0).toUpperCase() + cat.slice(1)}
-${categoryTasks.map(t => `- ${t.id}: ${t.name} (${t.estimatedHours}h)`).join('\n')}
+    const categories = [...new Set(tasks.map((t) => t.category))];
+
+    return categories
+      .map((cat) => {
+        const categoryTasks = tasks.filter((t) => t.category === cat);
+        return `### ${cat.charAt(0).toUpperCase() + cat.slice(1)}
+${categoryTasks.map((t) => `- ${t.id}: ${t.name} (${t.estimatedHours}h)`).join("\n")}
 `;
-    }).join('\n');
+      })
+      .join("\n");
   }
 
   private generateTimelineTable(tasks: Task[]): string {
     const phases = [
-      { name: 'Setup', tasks: tasks.filter(t => t.category === 'setup') },
-      { name: 'Core Development', tasks: tasks.filter(t => ['feature', 'data', 'api'].includes(t.category)) },
-      { name: 'Frontend', tasks: tasks.filter(t => t.category === 'frontend') },
-      { name: 'Testing', tasks: tasks.filter(t => t.category === 'testing') },
-      { name: 'Deployment', tasks: tasks.filter(t => t.category === 'deployment') }
+      { name: "Setup", tasks: tasks.filter((t) => t.category === "setup") },
+      {
+        name: "Core Development",
+        tasks: tasks.filter((t) =>
+          ["feature", "data", "api"].includes(t.category)
+        ),
+      },
+      {
+        name: "Frontend",
+        tasks: tasks.filter((t) => t.category === "frontend"),
+      },
+      { name: "Testing", tasks: tasks.filter((t) => t.category === "testing") },
+      {
+        name: "Deployment",
+        tasks: tasks.filter((t) => t.category === "deployment"),
+      },
     ];
 
-    return phases.filter(p => p.tasks.length > 0).map(phase => {
-      const hours = phase.tasks.reduce((sum, t) => sum + t.estimatedHours, 0);
-      const days = Math.ceil(hours / 8);
-      const taskIds = phase.tasks.map(t => t.id).join(', ');
-      return `| ${phase.name} | ${taskIds} | ${hours} | ${days} |`;
-    }).join('\n');
+    return phases
+      .filter((p) => p.tasks.length > 0)
+      .map((phase) => {
+        const hours = phase.tasks.reduce((sum, t) => sum + t.estimatedHours, 0);
+        const days = Math.ceil(hours / 8);
+        const taskIds = phase.tasks.map((t) => t.id).join(", ");
+        return `| ${phase.name} | ${taskIds} | ${hours} | ${days} |`;
+      })
+      .join("\n");
   }
 
   private identifyCriticalPath(tasks: Task[]): string {
     // Simplified critical path identification
-    const criticalTasks = tasks.filter(t => t.priority === 'high');
+    const criticalTasks = tasks.filter((t) => t.priority === "high");
     return `The critical path includes the following high-priority tasks that must be completed sequentially:
-${criticalTasks.map(t => `1. ${t.id}: ${t.name}`).join('\n')}
+${criticalTasks.map((t) => `1. ${t.id}: ${t.name}`).join("\n")}
 
 Total critical path duration: ${criticalTasks.reduce((sum, t) => sum + t.estimatedHours, 0)} hours`;
   }
@@ -594,7 +652,7 @@ Total critical path duration: ${criticalTasks.reduce((sum, t) => sum + t.estimat
   private generateResourceAllocation(tasks: Task[]): string {
     const totalHours = tasks.reduce((sum, t) => sum + t.estimatedHours, 0);
     const totalDays = Math.ceil(totalHours / 8);
-    
+
     return `### Summary
 - Total Estimated Hours: ${totalHours}
 - Total Working Days: ${totalDays}
@@ -603,16 +661,20 @@ Total critical path duration: ${criticalTasks.reduce((sum, t) => sum + t.estimat
   }
 
   private identifyBottlenecks(tasks: Task[]): string {
-    const bottlenecks = tasks.filter(t => {
-      const dependentTasks = tasks.filter(task => task.dependencies.includes(t.id));
+    const bottlenecks = tasks.filter((t) => {
+      const dependentTasks = tasks.filter((task) =>
+        task.dependencies.includes(t.id)
+      );
       return dependentTasks.length >= 2;
     });
 
     if (bottlenecks.length === 0) {
-      return 'No significant bottlenecks identified';
+      return "No significant bottlenecks identified";
     }
 
-    return bottlenecks.map(t => `- ${t.id}: ${t.name} - Multiple tasks depend on this`).join('\n');
+    return bottlenecks
+      .map((t) => `- ${t.id}: ${t.name} - Multiple tasks depend on this`)
+      .join("\n");
   }
 
   private generateTaskSummary(tasks: Task[], verification: any): string {
@@ -632,25 +694,33 @@ Total critical path duration: ${criticalTasks.reduce((sum, t) => sum + t.estimat
 ${this.getTaskDistribution(tasks)}
 
 ## Priority Breakdown
-- **High Priority**: ${tasks.filter(t => t.priority === 'high').length} tasks
-- **Medium Priority**: ${tasks.filter(t => t.priority === 'medium').length} tasks
-- **Low Priority**: ${tasks.filter(t => t.priority === 'low').length} tasks
+- **High Priority**: ${tasks.filter((t) => t.priority === "high").length} tasks
+- **Medium Priority**: ${tasks.filter((t) => t.priority === "medium").length} tasks
+- **Low Priority**: ${tasks.filter((t) => t.priority === "low").length} tasks
 
 ## Verification Status
-- **Valid**: ${verification.isValid ? 'Yes' : 'No'}
+- **Valid**: ${verification.isValid ? "Yes" : "No"}
 - **Coverage Confidence**: ${(verification.confidence * 100).toFixed(1)}%
 - **Issues**: ${verification.issues.length}
 - **Suggestions**: ${verification.suggestions.length}
 
-${verification.issues.length > 0 ? `
+${
+  verification.issues.length > 0
+    ? `
 ## Issues to Address
-${verification.issues.map((issue: string, i: number) => `${i + 1}. ${issue}`).join('\n')}
-` : ''}
+${verification.issues.map((issue: string, i: number) => `${i + 1}. ${issue}`).join("\n")}
+`
+    : ""
+}
 
-${verification.suggestions.length > 0 ? `
+${
+  verification.suggestions.length > 0
+    ? `
 ## Improvement Suggestions
-${verification.suggestions.map((suggestion: string, i: number) => `${i + 1}. ${suggestion}`).join('\n')}
-` : ''}
+${verification.suggestions.map((suggestion: string, i: number) => `${i + 1}. ${suggestion}`).join("\n")}
+`
+    : ""
+}
 
 ## Next Steps
 1. Review task breakdown with stakeholders
@@ -669,12 +739,14 @@ ${verification.suggestions.map((suggestion: string, i: number) => `${i + 1}. ${s
   }
 
   private getTaskDistribution(tasks: Task[]): string {
-    const categories = [...new Set(tasks.map(t => t.category))];
-    return categories.map(cat => {
-      const count = tasks.filter(t => t.category === cat).length;
-      const percentage = ((count / tasks.length) * 100).toFixed(1);
-      return `- **${cat.charAt(0).toUpperCase() + cat.slice(1)}**: ${count} tasks (${percentage}%)`;
-    }).join('\n');
+    const categories = [...new Set(tasks.map((t) => t.category))];
+    return categories
+      .map((cat) => {
+        const count = tasks.filter((t) => t.category === cat).length;
+        const percentage = ((count / tasks.length) * 100).toFixed(1);
+        return `- **${cat.charAt(0).toUpperCase() + cat.slice(1)}**: ${count} tasks (${percentage}%)`;
+      })
+      .join("\n");
   }
 
   private async verifyTasks(tasks: Task[], spec: string): Promise<any> {
@@ -683,24 +755,30 @@ ${verification.suggestions.map((suggestion: string, i: number) => `${i + 1}. ${s
 
     // Check task coverage
     if (tasks.length < 5) {
-      issues.push('Insufficient task breakdown - consider more granular decomposition');
+      issues.push(
+        "Insufficient task breakdown - consider more granular decomposition"
+      );
     }
 
     // Check for orphan tasks (no dependencies and nothing depends on them)
-    const orphanTasks = tasks.filter(t => {
+    const orphanTasks = tasks.filter((t) => {
       const hasDependencies = t.dependencies.length > 0;
-      const isDependency = tasks.some(other => other.dependencies.includes(t.id));
-      return !hasDependencies && !isDependency && t.category !== 'setup';
+      const isDependency = tasks.some((other) =>
+        other.dependencies.includes(t.id)
+      );
+      return !hasDependencies && !isDependency && t.category !== "setup";
     });
 
     if (orphanTasks.length > 0) {
-      issues.push(`Orphan tasks detected: ${orphanTasks.map(t => t.id).join(', ')}`);
+      issues.push(
+        `Orphan tasks detected: ${orphanTasks.map((t) => t.id).join(", ")}`
+      );
     }
 
     // Check for missing essential categories
-    const categories = new Set(tasks.map(t => t.category));
-    const essentialCategories = ['setup', 'testing'];
-    
+    const categories = new Set(tasks.map((t) => t.category));
+    const essentialCategories = ["setup", "testing"];
+
     for (const essential of essentialCategories) {
       if (!categories.has(essential)) {
         issues.push(`Missing essential task category: ${essential}`);
@@ -708,21 +786,31 @@ ${verification.suggestions.map((suggestion: string, i: number) => `${i + 1}. ${s
     }
 
     // Check if spec requirements are covered
-    if (spec && spec.includes('authentication') && !tasks.some(t => t.name.toLowerCase().includes('auth'))) {
-      suggestions.push('Specification mentions authentication but no explicit auth tasks found');
+    if (
+      spec &&
+      spec.includes("authentication") &&
+      !tasks.some((t) => t.name.toLowerCase().includes("auth"))
+    ) {
+      suggestions.push(
+        "Specification mentions authentication but no explicit auth tasks found"
+      );
     }
 
     // Check time estimates
-    const unrealisticTasks = tasks.filter(t => t.estimatedHours > 80 || t.estimatedHours < 2);
+    const unrealisticTasks = tasks.filter(
+      (t) => t.estimatedHours > 80 || t.estimatedHours < 2
+    );
     if (unrealisticTasks.length > 0) {
-      suggestions.push('Review time estimates for tasks - some seem unrealistic');
+      suggestions.push(
+        "Review time estimates for tasks - some seem unrealistic"
+      );
     }
 
     return {
       isValid: issues.length === 0,
       issues,
       suggestions,
-      confidence: Math.max(0.5, 1 - (issues.length * 0.1))
+      confidence: Math.max(0.5, 1 - issues.length * 0.1),
     };
   }
 }

@@ -1,22 +1,23 @@
 #!/usr/bin/env node
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
-  GetPromptRequestSchema
-} from '@modelcontextprotocol/sdk/types.js';
+  GetPromptRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 
-import { ResourceManager } from './resources/manager.js';
-import { InitTool } from './tools/init.js';
-import { SpecTool } from './tools/spec.js';
-import { PlanTool } from './tools/plan.js';
-import { TasksTool } from './tools/tasks.js';
-import { ImplementTool } from './tools/implement.js';
-import type { SDDTool } from './types/index.js';
+import { ResourceManager } from "./resources/manager.js";
+import { InitTool } from "./tools/init.js";
+import { SpecTool } from "./tools/spec.js";
+import { PlanTool } from "./tools/plan.js";
+import { TasksTool } from "./tools/tasks.js";
+import { ImplementTool } from "./tools/implement.js";
+import type { SDDTool } from "./types/index.js";
+import { z } from "zod";
 
 class SpecifyMCPServer {
   private server: Server;
@@ -26,19 +27,19 @@ class SpecifyMCPServer {
   constructor() {
     this.server = new Server(
       {
-        name: 'specify-mcp-server',
-        version: '1.0.0',
+        name: "specify-mcp-server",
+        version: "1.0.0",
       },
       {
         capabilities: {
           tools: {},
           resources: {},
-          prompts: {}
+          prompts: {},
         },
       }
     );
 
-    this.resourceManager = new ResourceManager('./.specify');
+    this.resourceManager = new ResourceManager("./.specify");
     this.tools = new Map();
     this.initializeTools();
     this.setupHandlers();
@@ -62,24 +63,21 @@ class SpecifyMCPServer {
   private setupHandlers(): void {
     // Handle tool listing
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      const toolsList = Array.from(this.tools.values()).map(tool => ({
+      const toolsList = Array.from(this.tools.values()).map((tool) => ({
         name: tool.name,
         description: tool.description,
-        inputSchema: {
-          type: 'object' as const,
-          properties: {}
-        }
+        inputSchema: this.convertZodToJsonSchema(tool.inputSchema),
       }));
 
       return {
-        tools: toolsList
+        tools: toolsList,
       };
     });
 
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const tool = this.tools.get(request.params.name);
-      
+
       if (!tool) {
         throw new Error(`Tool not found: ${request.params.name}`);
       }
@@ -87,17 +85,18 @@ class SpecifyMCPServer {
       try {
         const result = await tool.handler(request.params.arguments);
         return {
-          content: result.content
+          content: result.content,
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
         return {
           content: [
             {
-              type: 'text',
-              text: `Error executing tool ${request.params.name}: ${errorMessage}`
-            }
-          ]
+              type: "text",
+              text: `Error executing tool ${request.params.name}: ${errorMessage}`,
+            },
+          ],
         };
       }
     });
@@ -105,76 +104,87 @@ class SpecifyMCPServer {
     // Handle resource listing
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       // List all available project resources
-      const projects = await this.resourceManager.listResources('', 'project.json');
-      
-      const resources = projects.map(project => ({
+      const projects = await this.resourceManager.listResources(
+        "",
+        "project.json"
+      );
+
+      const resources = projects.map((project) => ({
         uri: project.uri,
         name: project.name,
         mimeType: project.mimeType,
-        description: 'SDD Project Resource'
+        description: "SDD Project Resource",
       }));
 
       return {
-        resources
+        resources,
       };
     });
 
     // Handle resource reading
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      const uri = request.params.uri;
-      
-      // Parse URI to extract project ID and resource path
-      const match = uri.match(/^specify:\/\/([^\/]+)\/(.+)$/);
-      if (!match) {
-        throw new Error(`Invalid resource URI: ${uri}`);
-      }
+    this.server.setRequestHandler(
+      ReadResourceRequestSchema,
+      async (request) => {
+        const uri = request.params.uri;
 
-      const [, projectId, resourcePath] = match;
-      
-      try {
-        const resource = await this.resourceManager.readResource(projectId, resourcePath);
-        return {
-          contents: [
-            {
-              uri: resource.uri,
-              mimeType: resource.mimeType,
-              text: resource.content
-            }
-          ]
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Resource not found';
-        throw new Error(`Failed to read resource: ${errorMessage}`);
+        // Parse URI to extract project ID and resource path
+        const match = uri.match(/^specify:\/\/([^\/]+)\/(.+)$/);
+        if (!match) {
+          throw new Error(`Invalid resource URI: ${uri}`);
+        }
+
+        const [, projectId, resourcePath] = match;
+
+        try {
+          const resource = await this.resourceManager.readResource(
+            projectId,
+            resourcePath
+          );
+          return {
+            contents: [
+              {
+                uri: resource.uri,
+                mimeType: resource.mimeType,
+                text: resource.content,
+              },
+            ],
+          };
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Resource not found";
+          throw new Error(`Failed to read resource: ${errorMessage}`);
+        }
       }
-    });
+    );
 
     // Handle prompts listing
     this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
       return {
         prompts: [
           {
-            name: 'specify_workflow',
-            description: 'Start the complete Specify workflow for a new project',
+            name: "specify_workflow",
+            description:
+              "Start the complete Specify workflow for a new project",
             arguments: [
               {
-                name: 'projectName',
-                description: 'Name of the project to create',
-                required: true
-              }
-            ]
+                name: "projectName",
+                description: "Name of the project to create",
+                required: true,
+              },
+            ],
           },
           {
-            name: 'specify_status',
-            description: 'Check the status of a Specify project',
+            name: "specify_status",
+            description: "Check the status of a Specify project",
             arguments: [
               {
-                name: 'projectId',
-                description: 'ID of the project to check',
-                required: true
-              }
-            ]
-          }
-        ]
+                name: "projectId",
+                description: "ID of the project to check",
+                required: true,
+              },
+            ],
+          },
+        ],
       };
     });
 
@@ -183,13 +193,13 @@ class SpecifyMCPServer {
       const promptName = request.params.name;
       const args = request.params.arguments || {};
 
-      if (promptName === 'specify_workflow') {
+      if (promptName === "specify_workflow") {
         return {
           messages: [
             {
-              role: 'system',
+              role: "system",
               content: {
-                type: 'text',
+                type: "text",
                 text: `You are an AI assistant helping with Specification-Driven Development.
                 
 The Specify workflow consists of the following stages:
@@ -199,57 +209,127 @@ The Specify workflow consists of the following stages:
 4. **tasks**: Break down into detailed tasks
 5. **implement**: Generate TDD tests and implementation guides
 
-Guide the user through each stage, ensuring proper validation and verification at each step.`
-              }
+Guide the user through each stage, ensuring proper validation and verification at each step.`,
+              },
             },
             {
-              role: 'user',
+              role: "user",
               content: {
-                type: 'text',
-                text: `I want to create a new project called "${args.projectName}". Let's start the Specify workflow.`
-              }
-            }
-          ]
+                type: "text",
+                text: `I want to create a new project called "${args.projectName}". Let's start the Specify workflow.`,
+              },
+            },
+          ],
         };
       }
 
-      if (promptName === 'specify_status') {
+      if (promptName === "specify_status") {
         const projectId = args.projectId as string;
         try {
-          const projectData = await this.resourceManager.readResource(projectId, 'project.json');
+          const projectData = await this.resourceManager.readResource(
+            projectId,
+            "project.json"
+          );
           const project = JSON.parse(projectData.content);
-          
+
           return {
             messages: [
               {
-                role: 'system',
+                role: "system",
                 content: {
-                  type: 'text',
+                  type: "text",
                   text: `Project Status for ${project.projectName}:
 - Current Stage: ${project.workflow.currentStage}
-- Completed Stages: ${project.workflow.completedStages.join(', ') || 'None'}
-- Next Stage: ${project.workflow.nextStage}`
-                }
-              }
-            ]
+- Completed Stages: ${project.workflow.completedStages.join(", ") || "None"}
+- Next Stage: ${project.workflow.nextStage}`,
+                },
+              },
+            ],
           };
         } catch (error) {
           return {
             messages: [
               {
-                role: 'system',
+                role: "system",
                 content: {
-                  type: 'text',
-                  text: `Project ${projectId} not found or invalid.`
-                }
-              }
-            ]
+                  type: "text",
+                  text: `Project ${projectId} not found or invalid.`,
+                },
+              },
+            ],
           };
         }
       }
 
       throw new Error(`Unknown prompt: ${promptName}`);
     });
+  }
+
+  private convertZodToJsonSchema(zodSchema: z.ZodSchema): any {
+    if (zodSchema instanceof z.ZodObject) {
+      const shape = zodSchema.shape;
+      const properties: any = {};
+      const required: string[] = [];
+
+      for (const [key, value] of Object.entries(shape)) {
+        const zodField = value as z.ZodSchema;
+        let fieldSchema: any = {};
+
+        // Handle different zod types
+        if (zodField instanceof z.ZodString) {
+          fieldSchema.type = "string";
+        } else if (zodField instanceof z.ZodNumber) {
+          fieldSchema.type = "number";
+        } else if (zodField instanceof z.ZodBoolean) {
+          fieldSchema.type = "boolean";
+        } else if (zodField instanceof z.ZodArray) {
+          fieldSchema.type = "array";
+          fieldSchema.items = { type: "string" };
+        } else if (zodField instanceof z.ZodEnum) {
+          const values = zodField._def.values;
+          fieldSchema.type = "string";
+          fieldSchema.enum = values;
+        } else if (zodField instanceof z.ZodOptional) {
+          // Handle optional fields
+          const innerType = zodField._def.innerType;
+          if (innerType instanceof z.ZodString) {
+            fieldSchema.type = "string";
+          } else if (innerType instanceof z.ZodArray) {
+            fieldSchema.type = "array";
+            fieldSchema.items = { type: "string" };
+          } else if (innerType instanceof z.ZodEnum) {
+            fieldSchema.type = "string";
+            fieldSchema.enum = innerType._def.values;
+          } else if (innerType instanceof z.ZodObject) {
+            fieldSchema = this.convertZodToJsonSchema(innerType);
+          }
+        }
+
+        // Get description if available
+        if (zodField._def.description) {
+          fieldSchema.description = zodField._def.description;
+        }
+
+        properties[key] = fieldSchema;
+
+        // Add to required if not optional
+        if (!(zodField instanceof z.ZodOptional)) {
+          required.push(key);
+        }
+      }
+
+      return {
+        type: "object",
+        properties,
+        required: required.length > 0 ? required : undefined,
+      };
+    }
+
+    // Fallback for non-object schemas
+    return {
+      type: "object",
+      properties: {},
+    };
   }
 
   async start(): Promise<void> {
@@ -259,8 +339,8 @@ Guide the user through each stage, ensuring proper validation and verification a
     // Start the server with STDIO transport
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
-    console.error('Specify MCP Server started successfully');
+
+    console.error("Specify MCP Server started successfully");
   }
 }
 
@@ -270,24 +350,24 @@ async function main(): Promise<void> {
     const server = new SpecifyMCPServer();
     await server.start();
   } catch (error) {
-    console.error('Failed to start Specify MCP Server:', error);
+    console.error("Failed to start Specify MCP Server:", error);
     process.exit(1);
   }
 }
 
 // Handle process signals
-process.on('SIGINT', () => {
-  console.error('Received SIGINT, shutting down...');
+process.on("SIGINT", () => {
+  console.error("Received SIGINT, shutting down...");
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
-  console.error('Received SIGTERM, shutting down...');
+process.on("SIGTERM", () => {
+  console.error("Received SIGTERM, shutting down...");
   process.exit(0);
 });
 
 // Start the server
 main().catch((error) => {
-  console.error('Unhandled error:', error);
+  console.error("Unhandled error:", error);
   process.exit(1);
 });

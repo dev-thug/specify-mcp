@@ -1,18 +1,28 @@
-import { z } from 'zod';
-import type { SDDTool, ToolResult } from '../types/index.js';
-import { CommonVerifier } from '../verification/common.js';
-import { ResourceManager } from '../resources/manager.js';
+import { z } from "zod";
+import type { SDDTool, ToolResult } from "../types/index.js";
+import { CommonVerifier } from "../verification/common.js";
+import { ResourceManager } from "../resources/manager.js";
 
 const specInputSchema = z.object({
-  projectId: z.string().describe('Project ID from initialization'),
-  userRequirements: z.string().optional().describe('Additional requirements from user'),
-  focusAreas: z.array(z.string()).optional().describe('Areas to focus on in the spec'),
-  excludeAreas: z.array(z.string()).optional().describe('Areas to exclude from the spec')
+  projectId: z.string().describe("Project ID from initialization"),
+  userRequirements: z
+    .string()
+    .optional()
+    .describe("Additional requirements from user"),
+  focusAreas: z
+    .array(z.string())
+    .optional()
+    .describe("Areas to focus on in the spec"),
+  excludeAreas: z
+    .array(z.string())
+    .optional()
+    .describe("Areas to exclude from the spec"),
 });
 
 export class SpecTool implements SDDTool {
-  name = 'create_specification';
-  description = 'Create product specification document focusing on user needs and business value';
+  name = "create_specification";
+  description =
+    "Create product specification document focusing on user needs and business value";
   inputSchema = specInputSchema;
 
   private verifier: CommonVerifier;
@@ -25,65 +35,66 @@ export class SpecTool implements SDDTool {
 
   async handler(params: unknown): Promise<ToolResult> {
     const input = specInputSchema.parse(params);
-    
+
     // Read project metadata
     const projectData = await this.resourceManager.readResource(
       input.projectId,
-      'metadata.json'
+      "metadata.json"
     );
     const project = JSON.parse(projectData.content);
 
     // Generate specification sections
     const spec = await this.generateSpecification(project, input);
-    
+
     // Verify specification for ambiguity and completeness
     const verificationResult = await this.verifySpecification(spec);
-    
+
     // Save specification document
     await this.resourceManager.createResource(
       input.projectId,
-      'spec/specification.md',
+      "spec/specification.md",
       spec,
-      { stage: 'spec', verified: verificationResult.isValid }
+      { stage: "spec", verified: verificationResult.isValid }
     );
 
     // Create verification report
-    const verificationReport = this.createVerificationReport(verificationResult);
+    const verificationReport =
+      this.createVerificationReport(verificationResult);
     await this.resourceManager.createResource(
       input.projectId,
-      'spec/verification-report.md',
+      "spec/verification-report.md",
       verificationReport,
-      { stage: 'spec' }
+      { stage: "spec" }
     );
 
     // Update project workflow status
-    project.workflow.completedStages.push('spec');
-    project.workflow.currentStage = 'spec';
-    project.workflow.nextStage = 'plan';
-    
+    project.workflow.completedStages.push("spec");
+    project.workflow.currentStage = "spec";
+    project.workflow.nextStage = "plan";
+
     await this.resourceManager.updateResource(
       input.projectId,
-      'metadata.json',
+      "metadata.json",
       JSON.stringify(project, null, 2)
     );
 
     return {
       content: [
         {
-          type: 'text',
-          text: `Specification generated for project ${input.projectId}`
+          type: "text",
+          text: `Specification generated for project ${input.projectId}`,
         },
         {
-          type: 'resource',
-          uri: `specify://${input.projectId}/spec/specification.md`
+          type: "resource",
+          uri: `specify://${input.projectId}/spec/specification.md`,
         },
         {
-          type: 'text',
-          text: verificationResult.isValid 
-            ? 'Specification verified successfully' 
-            : `Specification has ${verificationResult.issues.length} issues to address`
-        }
-      ]
+          type: "text",
+          text: verificationResult.isValid
+            ? "Specification verified successfully"
+            : `Specification has ${verificationResult.issues.length} issues to address`,
+        },
+      ],
     };
   }
 
@@ -91,8 +102,8 @@ export class SpecTool implements SDDTool {
     project: any,
     input: z.infer<typeof specInputSchema>
   ): Promise<string> {
-    const date = new Date().toISOString().split('T')[0];
-    const userRequirements = input.userRequirements || '';
+    const date = new Date().toISOString().split("T")[0];
+    const userRequirements = input.userRequirements || "";
 
     return `# Feature Specification: ${project.projectName}
 
@@ -131,7 +142,7 @@ export class SpecTool implements SDDTool {
 ## User Scenarios & Testing *(mandatory)*
 
 ### Primary User Story
-${project.description || '[Describe the main user journey in plain language]'}
+${project.description || "[Describe the main user journey in plain language]"}
 
 ### Acceptance Scenarios
 1. **Given** initial system state, **When** user performs primary action, **Then** system delivers expected value
@@ -145,17 +156,22 @@ ${project.description || '[Describe the main user journey in plain language]'}
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
-${project.goals && project.goals.length > 0 ? 
-  project.goals.map((goal: string, i: number) => 
-    `- **FR-${String(i+1).padStart(3, '0')}**: System MUST ${goal.toLowerCase()}`
-  ).join('\n') : 
-  `- **FR-001**: System MUST provide core functionality [NEEDS CLARIFICATION: specific features not defined]
+${
+  project.goals && project.goals.length > 0
+    ? project.goals
+        .map(
+          (goal: string, i: number) =>
+            `- **FR-${String(i + 1).padStart(3, "0")}**: System MUST ${goal.toLowerCase()}`
+        )
+        .join("\n")
+    : `- **FR-001**: System MUST provide core functionality [NEEDS CLARIFICATION: specific features not defined]
 - **FR-002**: System MUST handle user authentication [NEEDS CLARIFICATION: auth method not specified]
 - **FR-003**: Users MUST be able to manage their data
 - **FR-004**: System MUST persist user preferences
-- **FR-005**: System MUST log all critical events`}
+- **FR-005**: System MUST log all critical events`
+}
 
-${userRequirements ? `\n*Additional requirements from user:*\n${userRequirements}\n` : ''}
+${userRequirements ? `\n*Additional requirements from user:*\n${userRequirements}\n` : ""}
 
 ### Key Entities *(include if feature involves data)*
 - **User**: Represents system users with authentication and preferences
@@ -181,9 +197,11 @@ ${userRequirements ? `\n*Additional requirements from user:*\n${userRequirements
 - [ ] Dependencies and assumptions identified
 
 ### Constraints & Assumptions
-${project.constraints && project.constraints.length > 0 ? 
-  `**Constraints:**\n${project.constraints.map((c: string) => `- ${c}`).join('\n')}` : 
-  '**Constraints:** None specified'}
+${
+  project.constraints && project.constraints.length > 0
+    ? `**Constraints:**\n${project.constraints.map((c: string) => `- ${c}`).join("\n")}`
+    : "**Constraints:** None specified"
+}
 
 **Assumptions:**
 - Users have necessary access permissions
@@ -208,30 +226,43 @@ ${project.constraints && project.constraints.length > 0 ?
 `;
   }
 
-
   private async verifySpecification(spec: string): Promise<any> {
     // Check for ambiguous terms
     const ambiguousTerms = [
-      'maybe', 'possibly', 'might', 'could', 'should probably',
-      'fast', 'slow', 'big', 'small', 'user-friendly', 'intuitive'
+      "maybe",
+      "possibly",
+      "might",
+      "could",
+      "should probably",
+      "fast",
+      "slow",
+      "big",
+      "small",
+      "user-friendly",
+      "intuitive",
     ];
-    
+
     const issues: string[] = [];
     const suggestions: string[] = [];
-    
+
     for (const term of ambiguousTerms) {
       if (spec.toLowerCase().includes(term)) {
         issues.push(`Ambiguous term found: "${term}"`);
-        suggestions.push(`Replace "${term}" with specific, measurable criteria`);
+        suggestions.push(
+          `Replace "${term}" with specific, measurable criteria`
+        );
       }
     }
 
     // Check for missing sections
     const requiredSections = [
-      'Executive Summary', 'Product Vision', 'Functional Requirements',
-      'Non-Functional Requirements', 'Acceptance Criteria'
+      "Executive Summary",
+      "Product Vision",
+      "Functional Requirements",
+      "Non-Functional Requirements",
+      "Acceptance Criteria",
     ];
-    
+
     for (const section of requiredSections) {
       if (!spec.includes(section)) {
         issues.push(`Missing required section: ${section}`);
@@ -239,8 +270,8 @@ ${project.constraints && project.constraints.length > 0 ?
     }
 
     // Check for completeness
-    if (!spec.includes('User Stories')) {
-      suggestions.push('Consider adding more detailed user stories');
+    if (!spec.includes("User Stories")) {
+      suggestions.push("Consider adding more detailed user stories");
     }
 
     // Run common verification
@@ -252,7 +283,7 @@ ${project.constraints && project.constraints.length > 0 ?
       isValid: issues.length === 0,
       issues,
       suggestions,
-      confidence: issues.length === 0 ? 0.9 : 0.7 - (issues.length * 0.05)
+      confidence: issues.length === 0 ? 0.9 : 0.7 - issues.length * 0.05,
     };
   }
 
@@ -260,20 +291,28 @@ ${project.constraints && project.constraints.length > 0 ?
     return `# Specification Verification Report
 
 ## Verification Status
-- **Valid**: ${verification.isValid ? 'Yes' : 'No'}
+- **Valid**: ${verification.isValid ? "Yes" : "No"}
 - **Confidence**: ${(verification.confidence * 100).toFixed(1)}%
 - **Issues Found**: ${verification.issues.length}
 - **Suggestions**: ${verification.suggestions.length}
 
 ## Issues
-${verification.issues.length > 0 
-  ? verification.issues.map((issue: string, i: number) => `${i + 1}. ${issue}`).join('\n')
-  : 'No issues found'}
+${
+  verification.issues.length > 0
+    ? verification.issues
+        .map((issue: string, i: number) => `${i + 1}. ${issue}`)
+        .join("\n")
+    : "No issues found"
+}
 
 ## Suggestions for Improvement
-${verification.suggestions.length > 0
-  ? verification.suggestions.map((suggestion: string, i: number) => `${i + 1}. ${suggestion}`).join('\n')
-  : 'No suggestions'}
+${
+  verification.suggestions.length > 0
+    ? verification.suggestions
+        .map((suggestion: string, i: number) => `${i + 1}. ${suggestion}`)
+        .join("\n")
+    : "No suggestions"
+}
 
 ## Recommendations
 1. Address all identified issues before proceeding to planning stage
@@ -282,9 +321,11 @@ ${verification.suggestions.length > 0
 4. Consider edge cases and error scenarios
 
 ## Next Steps
-${verification.isValid 
-  ? '✅ Specification is ready. Proceed to planning stage.'
-  : '⚠️ Address issues before proceeding to planning stage.'}
+${
+  verification.isValid
+    ? "✅ Specification is ready. Proceed to planning stage."
+    : "⚠️ Address issues before proceeding to planning stage."
+}
 `;
   }
 }
