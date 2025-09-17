@@ -6,6 +6,8 @@
 import { ResourceManager } from '../resources/manager.js';
 import { CommonVerifier } from '../verification/common.js';
 import { IVerificationContext } from '../types/index.js';
+import { WorkflowGuard } from '../workflow/workflow-guard.js';
+import * as path from 'path';
 
 export interface ImplementToolParams {
   projectId: string;
@@ -13,6 +15,8 @@ export interface ImplementToolParams {
 }
 
 export class ImplementTool {
+  private workflowGuard = new WorkflowGuard();
+  
   constructor(
     private readonly resourceManager: ResourceManager,
     private readonly verifier: CommonVerifier
@@ -20,6 +24,20 @@ export class ImplementTool {
 
   async execute(params: ImplementToolParams): Promise<string> {
     const { projectId, taskId } = params;
+
+    // Get project path for workflow check
+    const projectStructure = this.resourceManager.getProject(projectId);
+    if (!projectStructure) {
+      return `❌ **프로젝트를 찾을 수 없습니다**: ${projectId}`;
+    }
+
+    // Check if ready to proceed to implementation phase
+    const projectPath = path.dirname(projectStructure.projectPath);
+    const workflowStatus = await this.workflowGuard.checkPhaseReadiness(projectPath, 'implement');
+    
+    if (!workflowStatus.canProceed) {
+      return this.generateWorkflowBlockMessage(workflowStatus);
+    }
 
     // Load task details
     let taskContent = '';
@@ -748,5 +766,23 @@ ${taskInfo.description}
 
 ---
 *Follow TDD strictly: RED → GREEN → REFACTOR*`;
+  }
+
+  private generateWorkflowBlockMessage(status: any): string {
+    return `🚫 **구현 단계로 진행할 수 없습니다**
+
+📊 **현재 상태**: 품질 점수 ${status.qualityScore}/100 (필요: 85점 이상)
+
+❌ **차단 이유**:
+${status.blockingReasons.map((reason: string) => `   • ${reason}`).join('\n')}
+
+💡 **권장사항**:
+${status.recommendations.map((rec: string) => `   • ${rec}`).join('\n')}
+
+🎯 **SDD 원칙**: 모든 사전 단계가 완료된 후에만 구현을 시작하세요!
+
+📝 **다음 단계**: \`specify_tasks\`로 작업 분해를 완성하세요.
+
+⚠️ **중요**: 성급한 구현은 기술부채와 품질 저하를 야기합니다.`;
   }
 }

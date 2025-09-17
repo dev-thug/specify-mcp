@@ -8,6 +8,7 @@ import * as path from 'path';
 import { ResourceManager } from '../resources/manager.js';
 import { CommonVerifier } from '../verification/common.js';
 import { IVerificationContext } from '../types/index.js';
+import { WorkflowGuard } from '../workflow/workflow-guard.js';
 
 export interface TasksToolParams {
   projectId: string;
@@ -25,6 +26,8 @@ interface Task {
 }
 
 export class TasksTool {
+  private workflowGuard = new WorkflowGuard();
+  
   constructor(
     private readonly resourceManager: ResourceManager,
     private readonly verifier: CommonVerifier
@@ -32,6 +35,20 @@ export class TasksTool {
 
   async execute(params: TasksToolParams): Promise<string> {
     const { projectId, granularity = 'medium' } = params;
+
+    // Get project path for workflow check
+    const projectStructure = this.resourceManager.getProject(projectId);
+    if (!projectStructure) {
+      return `❌ **프로젝트를 찾을 수 없습니다**: ${projectId}`;
+    }
+
+    // Check if ready to proceed to tasks phase
+    const projectPath = path.dirname(projectStructure.projectPath);
+    const workflowStatus = await this.workflowGuard.checkPhaseReadiness(projectPath, 'tasks');
+    
+    if (!workflowStatus.canProceed) {
+      return this.generateWorkflowBlockMessage(workflowStatus);
+    }
 
     // Load plan and spec
     let planContent = '';
@@ -759,5 +776,21 @@ Tasks marked [P] can run in parallel
 ## Notes
 - Follow TDD strictly
 - Commit after each task`;
+  }
+
+  private generateWorkflowBlockMessage(status: any): string {
+    return `🚫 **작업 분해 단계로 진행할 수 없습니다**
+
+📊 **현재 상태**: 품질 점수 ${status.qualityScore}/100 (필요: 75점 이상)
+
+❌ **차단 이유**:
+${status.blockingReasons.map((reason: string) => `   • ${reason}`).join('\n')}
+
+💡 **권장사항**:
+${status.recommendations.map((rec: string) => `   • ${rec}`).join('\n')}
+
+🎯 **SDD 원칙**: 기술 계획이 완성된 후에 작업 분해를 진행하세요!
+
+📝 **다음 단계**: \`specify_plan\`으로 기술 계획을 완성하세요.`;
   }
 }

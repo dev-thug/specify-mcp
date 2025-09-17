@@ -5,14 +5,37 @@
 
 import fs from 'fs-extra';
 import * as path from 'path';
-import { ResourceManager } from '../resources/manager.js';
-import { CommonVerifier } from '../verification/common.js';
+import { z } from 'zod';
 import { IVerificationContext } from '../types/index.js';
+import { CommonVerifier } from '../verification/common.js';
+import { conversationalSpec } from './conversational-spec.js';
+
+// Import the ResourceManager class (defined in the SpecTool class for now)
+class ResourceManager {
+  constructor(private projectPath: string) {}
+  
+  async writeResource(uri: string, content: string): Promise<void> {
+    // Simple file writing implementation
+    const fileName = uri.split('/').pop() || 'current.md';
+    const specDir = path.join(this.projectPath, '.specify', 'spec');
+    await fs.ensureDir(specDir);
+    await fs.writeFile(path.join(specDir, fileName), content);
+  }
+  
+  async readResource(uri: string): Promise<{ text: string }> {
+    const fileName = uri.split('/').pop() || 'current.md';
+    const specDir = path.join(this.projectPath, '.specify', 'spec');
+    const content = await fs.readFile(path.join(specDir, fileName), 'utf-8');
+    return { text: content };
+  }
+}
 
 export interface SpecToolParams {
   projectId: string;
   userInput: string;
   refine?: boolean;
+  action?: 'create' | 'update' | 'read';
+  projectDirectory?: string;
 }
 
 export class SpecTool {
@@ -22,7 +45,17 @@ export class SpecTool {
   ) {}
 
   async execute(params: SpecToolParams): Promise<string> {
-    const { projectId, userInput, refine = false } = params;
+    const { projectId, userInput, refine = false, action = 'create' } = params;
+
+    // 사용자 입력이 너무 간단한 경우 대화형 가이드 제공
+    if (!refine && userInput.length < 100) {
+      return this.generateInteractiveGuide(userInput);
+    }
+
+    // action이 read인 경우 기존 문서 읽기
+    if (action === 'read') {
+      return this.readExistingSpec(projectId);
+    }
 
     // Load existing spec if refining
     let existingContent = '';
@@ -67,41 +100,35 @@ export class SpecTool {
     const validationResults = await this.verifier.verify(verificationContext);
     const confidence = this.verifier.calculateConfidence(validationResults);
 
-    // Save specification
-    await this.resourceManager.writeResource(
-      `specify://project/${projectId}/spec/current`,
-      specification
-    );
+    // Save specification resource
+    const specResource = await this.createSpecificationResource(projectId, specification, refine);
+    await this.resourceManager.writeResource(specResource.uri, specification);
 
-    // Generate response
+    // Generate response with validation results
     const errors = validationResults.filter(r => r.type === 'error');
     const warnings = validationResults.filter(r => r.type === 'warning');
 
-    let response = `Specification ${refine ? 'refined' : 'created'} successfully!\n`;
-    response += `Confidence: ${(confidence * 100).toFixed(1)}%\n\n`;
+    let response = `✅ **요구사항 명세서 ${refine ? '개선' : '생성'} 완료!**\n\n`;
+    response += `📊 **신뢰도**: ${(confidence * 100).toFixed(1)}%\n\n`;
 
     if (errors.length > 0) {
-      response += '⚠️ ERRORS (must fix):\n';
+      response += '❌ **오류 (수정 필요)**:\n';
       errors.forEach(e => {
-        response += `- ${e.message}\n  Suggestion: ${e.suggestion}\n`;
+        response += `   • ${e.message}\n     💡 ${e.suggestion}\n`;
       });
       response += '\n';
     }
 
     if (warnings.length > 0) {
-      response += '⚡ WARNINGS:\n';
+      response += '⚠️ **경고 (검토 권장)**:\n';
       warnings.forEach(w => {
-        response += `- ${w.message}\n`;
+        response += `   • ${w.message}\n`;
       });
       response += '\n';
     }
 
-    const clarifications = (specification.match(/\[NEEDS CLARIFICATION[^\]]*\]/g) || []).length;
-    if (clarifications > 0) {
-      response += `📝 ${clarifications} areas need clarification. Please refine the specification.\n`;
-    }
-
-    response += '\nNext step: Use `sdd_plan` to create technical implementation plan.';
+    response += '💾 **명세서가 프로젝트에 저장되었습니다.**\n\n';
+    response += '🔄 **다음 단계**: `specify_plan`으로 기술 계획을 수립하세요.';
 
     return response;
   }
@@ -342,4 +369,131 @@ export class SpecTool {
 - [ ] Requirements are testable
 - [ ] All scenarios covered`;
   }
+
+  private generateInteractiveGuide(initialInput: string): string {
+    return `🤔 **요구사항이 아직 구체적이지 않습니다**
+
+📝 **현재 입력**: "${initialInput}"
+
+💡 **더 구체적인 정보가 필요합니다**. 다음 질문들에 답해주세요:
+
+## 🎯 **핵심 질문들**
+
+### 1️⃣ **사용자와 목적**
+- 🙋‍♂️ **주요 사용자는 누구인가요?** (개인, 팀, 기업, 학생 등)
+- 🎯 **왜 이 앱이 필요한가요?** (어떤 문제를 해결하나요?)
+- 📈 **성공했다면 사용자에게 어떤 가치를 제공하나요?**
+
+### 2️⃣ **핵심 기능**
+- ⭐ **가장 중요한 3가지 기능은 무엇인가요?**
+- 🔄 **사용자가 주로 하게 될 작업의 흐름은?**
+- 🚫 **절대 빠뜨리면 안 되는 기능이 있나요?**
+
+### 3️⃣ **제약사항과 요구사항**
+- 📱 **어떤 플랫폼에서 사용하나요?** (웹, 모바일, 데스크톱)
+- 👥 **몇 명이 동시에 사용할 예정인가요?**
+- 🔒 **특별한 보안이나 성능 요구사항이 있나요?**
+
+## 📝 **예시 응답**
+
+다음과 같이 구체적으로 작성해주세요:
+
+\`\`\`
+이 투두 앱의 주요 사용자는 개인 개발자들입니다. 
+현재 개발자들은 여러 프로젝트를 동시에 진행하면서 할 일 관리가 어려워합니다.
+
+핵심 기능:
+1. 프로젝트별 할 일 분류 및 관리
+2. 우선순위 설정 및 마감일 알림
+3. 진행상황 시각화 대시보드
+
+웹 기반으로 개발하되, 모바일에서도 사용 가능해야 합니다.
+\`\`\`
+
+🔄 **다음 단계**: 위 정보를 바탕으로 다시 \`specify_requirements\`를 실행해주세요!`;
+  }
+
+  private async readExistingSpec(projectId: string): Promise<string> {
+    try {
+      const existing = await this.resourceManager.readResource(
+        `specify://project/${projectId}/spec/current`
+      );
+      return `📋 **현재 요구사항 명세서**
+
+${existing.text}
+
+💡 **수정이 필요하다면**: \`specify_requirements\` refine=true를 사용하세요.`;
+    } catch (error) {
+      return '❌ **요구사항 명세서가 없습니다**\n\n먼저 `specify_requirements`로 요구사항을 작성하세요.';
+    }
+  }
+
+  private async createSpecificationResource(projectId: string, content: string, refine: boolean) {
+    const uri = `specify://project/${projectId}/spec/current`;
+    return {
+      uri,
+      name: `Specification for ${projectId}`,
+      mimeType: 'text/markdown',
+      description: `Product requirements specification ${refine ? '(refined)' : '(new)'}`,
+      content
+    };
+  }
+}
+
+const SpecificationSchema = z.object({
+  action: z.enum(['create', 'update', 'conversational']),
+  project_path: z.string(),
+  description: z.string().optional(),
+  requirements: z.array(z.string()).optional(),
+  // Conversational mode parameters
+  conversation_action: z.enum(['start', 'answer', 'refine', 'complete']).optional(),
+  session_id: z.string().optional(),
+  question_id: z.string().optional(),
+  answer: z.string().optional(),
+  confidence: z.number().min(1).max(5).optional(),
+});
+
+export async function specifyRequirements(params: z.infer<typeof SpecificationSchema>) {
+  const { action, project_path, description, conversation_action, session_id, question_id, answer, confidence } = params;
+  
+  // Handle conversational mode - the new AI-SDD iterative dialogue approach
+  if (action === 'conversational') {
+    return conversationalSpec({
+      action: conversation_action || 'start',
+      project_path,
+      session_id,
+      question_id,
+      answer,
+      confidence,
+      initial_idea: description
+    });
+  }
+
+  // Legacy mode for backward compatibility
+  // TODO: Deprecate this in favor of conversational mode
+  return {
+    success: false,
+    message: `🔄 **Transitioning to Conversational Mode**
+
+The traditional specification generation has been replaced with an **iterative dialogue system** based on AI-SDD principles.
+
+**New Approach**: 
+- Use \`action: "conversational"\` with \`conversation_action: "start"\`
+- This enables the "iterative dialogue" process from AI-SDD research
+- Much more effective for requirement refinement
+
+**Example**:
+\`\`\`
+specify_requirements({
+  action: "conversational", 
+  conversation_action: "start",
+  project_path: "${project_path}",
+  description: "${description || 'your initial idea'}"
+})
+\`\`\`
+
+This new method implements the AI-SDD paper's core principle: "*Through iterative dialogue with AI, this idea becomes a comprehensive PRD*"`,
+    deprecated_mode: 'legacy',
+    recommended_action: 'conversational'
+  };
 }

@@ -150,6 +150,11 @@ export class ResourceManager {
     return projectId;
   }
 
+  // Get project structure by ID
+  getProject(projectId: string): IProjectStructure | null {
+    return this.structure.projects.get(projectId) || null;
+  }
+
   // Load existing project from .specify directory
   async loadProject(projectDirectory: string): Promise<string | null> {
     const specifyPath = path.join(projectDirectory, '.specify');
@@ -534,10 +539,6 @@ export class ResourceManager {
     return result;
   }
 
-  // Get project by ID
-  getProject(projectId: string): IProjectStructure | undefined {
-    return this.structure.projects.get(projectId);
-  }
 
   // List all projects
   listProjects(): string[] {

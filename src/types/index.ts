@@ -226,7 +226,7 @@ export interface IImplementation {
 
 export interface IValidationResult {
   type: 'error' | 'warning' | 'info';
-  category: 'hallucination' | 'ambiguity' | 'inconsistency' | 'incompleteness';
+  category: 'hallucination' | 'ambiguity' | 'inconsistency' | 'incompleteness' | 'quality';
   message: string;
   location?: string;
   suggestion?: string;

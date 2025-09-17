@@ -19,10 +19,11 @@ import { CommonVerifier } from './verification/common.js';
 
 // Import tools
 import { InitTool } from './tools/init.js';
-import { SpecTool } from './tools/spec.js';
 import { PlanTool } from './tools/plan.js';
 import { TasksTool } from './tools/tasks.js';
 import { ImplementTool } from './tools/implement.js';
+import { DocumentManagerTool } from './tools/document-manager.js';
+import { StatusTool } from './tools/status.js';
 
 export class SDDMCPServer {
   private server: Server;
@@ -80,24 +81,48 @@ export class SDDMCPServer {
           },
           {
             name: 'specify_requirements',
-            description: 'Generate product requirements specification focusing on WHAT and WHY',
+            description: 'Create specifications through iterative dialogue (AI-SDD approach)',
             inputSchema: {
               type: 'object',
               properties: {
-                projectId: {
+                action: {
                   type: 'string',
-                  description: 'Project ID (optional, uses current if not provided)',
+                  enum: ['create', 'update', 'conversational'],
+                  description: 'Action type (use "conversational" for AI-SDD dialogue)',
                 },
-                userInput: {
+                project_path: {
                   type: 'string',
-                  description: 'User description of features and requirements',
+                  description: 'Project directory path',
                 },
-                refine: {
-                  type: 'boolean',
-                  description: 'Whether to refine existing spec',
+                description: {
+                  type: 'string',
+                  description: 'Initial idea or description',
+                },
+                conversation_action: {
+                  type: 'string',
+                  enum: ['start', 'answer', 'refine', 'complete'],
+                  description: 'Conversational action (for action=conversational)',
+                },
+                session_id: {
+                  type: 'string',
+                  description: 'Session ID (for continuing conversations)',
+                },
+                question_id: {
+                  type: 'string',
+                  description: 'Question ID being answered',
+                },
+                answer: {
+                  type: 'string',
+                  description: 'Answer to the current question',
+                },
+                confidence: {
+                  type: 'number',
+                  minimum: 1,
+                  maximum: 5,
+                  description: 'Confidence level in answer (1-5)',
                 },
               },
-              required: ['userInput'],
+              required: ['action', 'project_path'],
             },
           },
           {
@@ -182,6 +207,55 @@ export class SDDMCPServer {
             },
           },
           {
+            name: 'specify_manage',
+            description: 'CRUD operations for SDD documents (list, read, update, delete)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                action: {
+                  type: 'string',
+                  enum: ['list', 'read', 'update', 'delete'],
+                  description: 'Operation to perform',
+                },
+                projectDirectory: {
+                  type: 'string',
+                  description: 'Project directory (optional, uses current if not provided)',
+                },
+                resourceType: {
+                  type: 'string',
+                  enum: ['spec', 'plan', 'task', 'implementation'],
+                  description: 'Type of resource to manage',
+                },
+                resourcePath: {
+                  type: 'string',
+                  description: 'Path to specific resource (e.g., "spec/current", "plan/research")',
+                },
+                content: {
+                  type: 'string',
+                  description: 'Content for update operations',
+                },
+              },
+              required: ['action'],
+            },
+          },
+          {
+            name: 'specify_status',
+            description: 'Analyze project status and provide workflow guidance',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                projectDirectory: {
+                  type: 'string',
+                  description: 'Project directory (optional, uses current if not provided)',
+                },
+                detailed: {
+                  type: 'boolean',
+                  description: 'Show detailed analysis and recommendations',
+                },
+              },
+            },
+          },
+          {
             name: 'specify_list_projects',
             description: 'List all specification-driven projects',
             inputSchema: {
@@ -233,20 +307,14 @@ export class SDDMCPServer {
           }
 
           case 'specify_requirements': {
-            const projectId = (args as any).projectId || this.currentProjectId;
-            if (!projectId) {
-              throw new Error('No project ID provided and no current project set');
-            }
-            const specTool = new SpecTool(this.resourceManager, this.verifier);
-            const result = await specTool.execute({
-              ...(args as any),
-              projectId,
-            });
+            // Import the new conversational specification function
+            const { specifyRequirements } = await import('./tools/spec.js');
+            const result = await specifyRequirements(args as any);
             return {
               content: [
                 {
                   type: 'text',
-                  text: result,
+                  text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
                 },
               ],
             };
@@ -302,6 +370,32 @@ export class SDDMCPServer {
               ...(args as any),
               projectId,
             });
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: result,
+                },
+              ],
+            };
+          }
+
+          case 'specify_manage': {
+            const documentManagerTool = new DocumentManagerTool(this.resourceManager);
+            const result = await documentManagerTool.execute(args as any);
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: result,
+                },
+              ],
+            };
+          }
+
+          case 'specify_status': {
+            const statusTool = new StatusTool(this.resourceManager);
+            const result = await statusTool.execute(args as any);
             return {
               content: [
                 {

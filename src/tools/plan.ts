@@ -8,6 +8,7 @@ import * as path from 'path';
 import { ResourceManager } from '../resources/manager.js';
 import { CommonVerifier } from '../verification/common.js';
 import { IVerificationContext, ITechStack } from '../types/index.js';
+import { WorkflowGuard } from '../workflow/workflow-guard.js';
 
 export interface PlanToolParams {
   projectId: string;
@@ -16,6 +17,8 @@ export interface PlanToolParams {
 }
 
 export class PlanTool {
+  private workflowGuard = new WorkflowGuard();
+  
   constructor(
     private readonly resourceManager: ResourceManager,
     private readonly verifier: CommonVerifier
@@ -23,6 +26,20 @@ export class PlanTool {
 
   async execute(params: PlanToolParams): Promise<string> {
     const { projectId, techStack, refine = false } = params;
+
+    // Get project path for workflow check
+    const projectStructure = this.resourceManager.getProject(projectId);
+    if (!projectStructure) {
+      return `❌ **프로젝트를 찾을 수 없습니다**: ${projectId}`;
+    }
+
+    // Check if ready to proceed to plan phase
+    const projectPath = path.dirname(projectStructure.projectPath);
+    const workflowStatus = await this.workflowGuard.checkPhaseReadiness(projectPath, 'plan');
+    
+    if (!workflowStatus.canProceed) {
+      return this.generateWorkflowBlockMessage(workflowStatus);
+    }
 
     // Load specification
     let specContent = '';
@@ -614,5 +631,22 @@ tests/
 - Tasks will be generated based on design
 - TDD approach enforced
 - Parallel execution identified`;
+  }
+
+  private generateWorkflowBlockMessage(status: any): string {
+    return `🚫 **Cannot proceed to technical planning phase**
+
+📊 **Current Status**: Quality score ${status.qualityScore}/100 (Required: 80+)
+🔄 **Iterations**: ${status.iterationCount} (Required: ${status.requiredIterations || 2}+)
+
+❌ **Blocking Issues**:
+${status.blockingReasons.map((reason: string) => `   • ${reason}`).join('\n')}
+
+💡 **Recommendations**:
+${status.recommendations.map((rec: string) => `   • ${rec}`).join('\n')}
+
+🎯 **AI-SDD Principle**: Requirements must be thoroughly specified before technical planning.
+
+📝 **Next Step**: Improve requirements with \`specify_requirements\` action=update.`;
   }
 }

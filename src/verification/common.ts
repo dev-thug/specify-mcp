@@ -4,8 +4,11 @@
  */
 
 import { IValidationResult, IVerificationContext } from '../types/index.js';
+import { AdvancedQualityAnalyzer } from './advanced-quality-analyzer.js';
 
 export class CommonVerifier {
+  private readonly advancedAnalyzer = new AdvancedQualityAnalyzer();
+  
   private readonly hallucinationPatterns = [
     /\b(probably|maybe|might|could be|I think|I believe|assume|guess)\b/gi,
     /\b(should work|ought to|supposed to)\b/gi,
@@ -22,21 +25,36 @@ export class CommonVerifier {
   ];
 
   private readonly technicalDetailPatterns = [
-    /\b(React|Vue|Angular|Express|Django|Flask|Rails)\b/g,
-    /\b(PostgreSQL|MySQL|MongoDB|Redis|SQLite)\b/g,
-    /\b(TypeScript|JavaScript|Python|Java|C\+\+|Rust)\b/g,
-    /\b(REST|GraphQL|gRPC|WebSocket)\b/g,
-    /\b(Docker|Kubernetes|AWS|Azure|GCP)\b/g,
+    // Actual implementation code patterns (more restrictive per AI-SDD)
+    /\bimport\s+.*from\s+['"][^'"]+['"]/g,
+    /\bfunction\s+\w+\s*\([^)]*\)\s*\{/g,
+    /\bclass\s+\w+\s*(?:extends\s+\w+)?\s*\{/g,
+    /\b(?:const|let|var)\s+\w+\s*=\s*(?:new\s+)?\w+/g,
+    /\b(?:npm|yarn|pip)\s+install\s+/g,
+    /\bpackage\.json|requirements\.txt|Gemfile/g,
+    /\b(?:GET|POST|PUT|DELETE)\s+\/api\//g, // Specific API endpoints
+    /\b\w+\.\w+\(\)/g, // Method calls
+    /\b(?:SELECT|INSERT|UPDATE|DELETE)\s+/gi, // SQL statements
   ];
 
   async verify(context: IVerificationContext): Promise<IValidationResult[]> {
     const results: IValidationResult[] = [];
     
-    // Check for hallucination indicators
+    // Use advanced quality analysis as primary verification
+    const qualityAssessment = await this.advancedAnalyzer.analyzeSpecification(
+      context.content, 
+      context.phase
+    );
+    
+    // Convert quality assessment to validation results
+    const qualityResults = this.convertQualityToValidationResults(qualityAssessment);
+    results.push(...qualityResults);
+    
+    // Still check for hallucination indicators (AI-SDD requirement)
     const hallucinationResults = this.detectHallucination(context);
     results.push(...hallucinationResults);
     
-    // Check for ambiguity
+    // Legacy ambiguity detection (kept for backward compatibility)
     const ambiguityResults = this.detectAmbiguity(context);
     results.push(...ambiguityResults);
     
@@ -359,6 +377,38 @@ export class CommonVerifier {
   }
 
   // Calculate confidence score for overall document
+  private convertQualityToValidationResults(assessment: any): IValidationResult[] {
+    const results: IValidationResult[] = [];
+    
+    // Convert each dimension to validation results
+    for (const dimension of assessment.dimensions) {
+      if (dimension.score < 0.6) {
+        results.push({
+          type: dimension.score < 0.4 ? 'error' : 'warning',
+          category: 'quality',
+          message: `${dimension.name} quality insufficient (${(dimension.score * 100).toFixed(0)}%)`,
+          location: 'Document structure',
+          suggestion: dimension.issues.join('; '),
+          confidence: 0.9
+        });
+      }
+    }
+    
+    // Add overall quality assessment
+    if (assessment.requiresIteration) {
+      results.push({
+        type: assessment.severity === 'critical' ? 'error' : 'warning',
+        category: 'quality',
+        message: `Overall document quality needs improvement (${assessment.overallScore.toFixed(0)}%)`,
+        location: 'Complete document',
+        suggestion: assessment.recommendations.slice(0, 3).join('; '),
+        confidence: 0.95
+      });
+    }
+    
+    return results;
+  }
+
   calculateConfidence(results: IValidationResult[]): number {
     if (results.length === 0) return 1.0;
     
