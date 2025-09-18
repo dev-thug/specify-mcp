@@ -1,10 +1,10 @@
 /**
  * Phase-Specific Evaluator
  * Evaluates documents according to their specific phase requirements
- * Solves the problem of evaluating spec documents with plan criteria
  */
 
 import { SemanticQualityAnalyzer, SemanticAnalysisResult } from './semantic-quality-analyzer.js';
+import { phaseValidator } from '../validators/phase-validator.js';
 
 export interface PhaseEvaluationResult {
   phase: string;
@@ -31,20 +31,35 @@ abstract class BasePhaseEvaluator {
 export class SpecEvaluator extends BasePhaseEvaluator {
   
   evaluate(content: string): PhaseEvaluationResult {
-    const semanticAnalysis = this.analyzer.analyze(content, 'spec');
+    const phase = 'spec';
+    
+    // Use semantic analyzer for base analysis
+    const semanticAnalysis = this.analyzer.analyze(content, phase);
+    
+    // Use PhaseValidator for strict content validation
+    const phaseValidation = phaseValidator.validatePhase(phase, content);
+    
+    // Get phase requirements
     const requirements = this.getPhaseRequirements();
     const inappropriate = this.getInappropriateRequirements();
     
     // Check for misplaced technical details
     const misplacedExpectations = this.findMisplacedContent(content, inappropriate);
     
-    // Generate phase-specific feedback
-    const phaseSpecificFeedback = this.generateSpecFeedback(semanticAnalysis, misplacedExpectations);
+    // Generate phase-specific feedback combining both validators
+    const phaseSpecificFeedback = this.generateSpecFeedback(
+      semanticAnalysis, 
+      misplacedExpectations,
+      phaseValidation
+    );
+    
+    // Determine if criteria are appropriate
+    const appropriateCriteria = phaseValidation.valid && misplacedExpectations.length === 0;
     
     return {
       phase: 'spec',
-      score: semanticAnalysis.totalScore,
-      appropriateCriteria: true,
+      score: semanticAnalysis.totalScore * phaseValidation.confidence,
+      appropriateCriteria,
       semanticAnalysis,
       phaseSpecificFeedback,
       misplacedExpectations,
@@ -96,7 +111,11 @@ export class SpecEvaluator extends BasePhaseEvaluator {
     return found;
   }
   
-  private generateSpecFeedback(analysis: SemanticAnalysisResult, misplaced: string[]): string {
+  private generateSpecFeedback(
+    analysis: SemanticAnalysisResult, 
+    misplaced: string[],
+    phaseValidation?: any
+  ): string {
     let feedback = '## Specification Phase Evaluation\n\n';
     
     feedback += '### ✅ What This Phase Should Contain:\n';
@@ -104,6 +123,17 @@ export class SpecEvaluator extends BasePhaseEvaluator {
     feedback += '- **Problem Definition**: What problems are being solved\n';
     feedback += '- **Requirements**: WHAT the system does (not HOW)\n';
     feedback += '- **Success Metrics**: How to measure success\n\n';
+    
+    // Include phase validation feedback if available
+    if (phaseValidation) {
+      if (phaseValidation.inappropriateContent.length > 0) {
+        feedback += '### 🚫 Removed Inappropriate Content:\n';
+        phaseValidation.inappropriateContent.forEach((item: string) => 
+          feedback += `- ${item}\n`
+        );
+        feedback += '\n';
+      }
+    }
     
     if (misplaced.length > 0) {
       feedback += '### ⚠️ Content That Belongs in Other Phases:\n';

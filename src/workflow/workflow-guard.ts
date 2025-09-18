@@ -19,6 +19,7 @@ import { IterationQualityTracker } from '../quality/iteration-quality-tracker.js
 import { scoreTransparency } from '../quality/score-transparency.js';
 import { SessionMemoryManager } from '../memory/session-memory-manager.js';
 import { isFeatureEnabled } from '../config/feature-flags.js';
+import { phaseValidator } from '../validators/phase-validator.js';
 
 export interface WorkflowGate {
   phase: 'init' | 'spec' | 'plan' | 'tasks' | 'implement';
@@ -591,6 +592,12 @@ ${Array.isArray(params.requirements) ? params.requirements.join('\n- ') : 'Basic
             console.log(`📂 Phase-Specific Evaluation for ${phase}:`);
             console.log(`  Appropriate content: ${phaseResult.appropriateCriteria ? '✅' : '❌'}`);
             console.log(`  Misplaced items: ${phaseResult.misplacedExpectations.length}`);
+          }
+          
+          // Additional validation using PhaseValidator
+          const strictValidation = phaseValidator.validatePhase(phase, content);
+          if (!strictValidation.valid) {
+            recommendations.push(...strictValidation.suggestions);
           }
 
           // Log comparison if enabled

@@ -65,9 +65,8 @@ When creating this spec from a user prompt:
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
 
-## Requirements *(mandatory)*
-
-### Functional Requirements
+## Functional Requirements *(mandatory)*
+<!-- SPEC Phase: WHAT and WHY only - NO technical implementation details -->
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
 - **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]

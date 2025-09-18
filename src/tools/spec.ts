@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { IVerificationContext } from '../types/index.js';
 import { CommonVerifier } from '../verification/common.js';
 import { conversationalSpec } from './conversational-spec.js';
+import { phaseValidator } from '../validators/phase-validator.js';
 
 // Import the ResourceManager class (defined in the SpecTool class for now)
 class ResourceManager {
@@ -90,6 +91,9 @@ export class SpecTool {
       existingContent
     );
 
+    // Phase-specific validation first
+    const phaseValidation = phaseValidator.validatePhase('spec', specification);
+    
     // Verify specification
     const verificationContext: IVerificationContext = {
       phase: 'spec',
@@ -98,7 +102,10 @@ export class SpecTool {
     };
 
     const validationResults = await this.verifier.verify(verificationContext);
-    const confidence = this.verifier.calculateConfidence(validationResults);
+    let confidence = this.verifier.calculateConfidence(validationResults);
+    
+    // Adjust confidence based on phase validation
+    confidence = confidence * phaseValidation.confidence;
 
     // Save specification resource
     const specResource = await this.createSpecificationResource(projectId, specification, refine);
@@ -110,6 +117,26 @@ export class SpecTool {
 
     let response = `✅ **요구사항 명세서 ${refine ? '개선' : '생성'} 완료!**\n\n`;
     response += `📊 **신뢰도**: ${(confidence * 100).toFixed(1)}%\n\n`;
+    
+    // Add phase validation feedback
+    if (!phaseValidation.valid || phaseValidation.inappropriateContent.length > 0) {
+      response += '🎯 **단계별 콘텐츠 검증**:\n';
+      
+      if (phaseValidation.inappropriateContent.length > 0) {
+        response += '   ⚠️ 제거된 부적절한 콘텐츠:\n';
+        phaseValidation.inappropriateContent.forEach(item => {
+          response += `      • ${item}\n`;
+        });
+      }
+      
+      if (phaseValidation.appropriateContent.length > 0) {
+        response += '   ✅ 적절한 콘텐츠:\n';
+        phaseValidation.appropriateContent.forEach(item => {
+          response += `      • ${item}\n`;
+        });
+      }
+      response += '\n';
+    }
 
     if (errors.length > 0) {
       response += '❌ **오류 (수정 필요)**:\n';
@@ -164,6 +191,14 @@ export class SpecTool {
     spec = this.fillRequirements(spec, concepts);
     spec = this.fillEntities(spec, concepts);
     spec = this.markAmbiguities(spec, concepts);
+
+    // IMPORTANT: Filter out any technical content that doesn't belong in spec
+    spec = phaseValidator.filterContent('spec', spec);
+    
+    // Add phase-specific guidance
+    if (!existingContent) {
+      spec = phaseValidator.generateGuidance('spec') + '\n\n---\n\n' + spec;
+    }
 
     return spec;
   }
