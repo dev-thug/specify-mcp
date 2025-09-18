@@ -263,6 +263,77 @@ export class SDDMCPServer {
             },
           },
           {
+            name: 'quality_analyzer',
+            description: '🔍 ENHANCED: Detailed quality analysis with specific improvement guidance',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                action: {
+                  type: 'string',
+                  enum: ['analyze', 'guidance'],
+                  description: 'Analysis action: analyze content or get guidance',
+                },
+                project_path: {
+                  type: 'string',
+                  description: 'Project directory path',
+                },
+                phase: {
+                  type: 'string',
+                  enum: ['spec', 'plan', 'tasks', 'implement'],
+                  description: 'Document phase to analyze',
+                },
+                content: {
+                  type: 'string',
+                  description: 'Document content to analyze (optional if file_path provided)',
+                },
+                file_path: {
+                  type: 'string',
+                  description: 'Path to document file to analyze',
+                },
+              },
+              required: ['action', 'project_path'],
+            },
+          },
+          {
+            name: 'document_scanner',
+            description: '📂 NEW: Scan and migrate existing project documents automatically',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                action: {
+                  type: 'string',
+                  enum: ['scan', 'migrate', 'list'],
+                  description: 'Scanner action',
+                },
+                project_path: {
+                  type: 'string',
+                  description: 'Project directory to scan',
+                },
+                include_subdirs: {
+                  type: 'boolean',
+                  description: 'Include subdirectories in scan',
+                  default: true,
+                },
+                max_depth: {
+                  type: 'number',
+                  description: 'Maximum directory depth to scan',
+                  default: 3,
+                },
+                auto_migrate: {
+                  type: 'boolean',
+                  description: 'Automatically migrate high-confidence documents',
+                  default: false,
+                },
+                force_migrate: {
+                  type: 'boolean',
+                  description: 'Force migration of all candidates (including low-confidence)',
+                  default: false,
+                },
+              },
+              required: ['action', 'project_path'],
+            },
+          },
+          {
             name: 'specify_status',
             description: 'Analyze project status and provide workflow guidance',
             inputSchema: {
@@ -421,6 +492,38 @@ export class SDDMCPServer {
             // Import and execute workflow enforcement
             const { workflowEnforcer } = await import('./tools/workflow-enforcer.js');
             const result = await workflowEnforcer(args as any);
+            
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: typeof result === 'string' ? result : 
+                        (result.message || JSON.stringify(result, null, 2)),
+                },
+              ],
+            };
+          }
+
+          case 'quality_analyzer': {
+            // Import and execute quality analysis
+            const { qualityAnalyzer } = await import('./tools/quality-analyzer.js');
+            const result = await qualityAnalyzer(args as any);
+            
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: typeof result === 'string' ? result : 
+                        (result.message || JSON.stringify(result, null, 2)),
+                },
+              ],
+            };
+          }
+
+          case 'document_scanner': {
+            // Import and execute document scanning
+            const { documentScanner } = await import('./tools/document-scanner.js');
+            const result = await documentScanner(args as any);
             
             return {
               content: [

@@ -5,6 +5,8 @@
 
 import fs from 'fs-extra';
 import * as path from 'path';
+// AdaptiveQuestionGenerator ready for integration
+// import { AdaptiveQuestionGenerator, ProjectComplexity } from '../quality/adaptive-question-generator.js';
 
 export interface Question {
   id: string;

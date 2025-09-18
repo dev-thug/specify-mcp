@@ -35,7 +35,7 @@ export class PlanTool {
 
     // Check if ready to proceed to plan phase
     const projectPath = path.dirname(projectStructure.projectPath);
-    const workflowStatus = await this.workflowGuard.checkPhaseReadiness(projectPath, 'plan');
+    const workflowStatus = await this.workflowGuard.checkPhaseReadiness(projectPath, 'plan', { techStack });
     
     if (!workflowStatus.canProceed) {
       return this.generateWorkflowBlockMessage(workflowStatus);

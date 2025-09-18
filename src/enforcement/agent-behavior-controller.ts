@@ -83,19 +83,19 @@ export class AgentBehaviorController {
   }
 
   private static generateSpecGuidance(qualityScore: number): AgentGuidance {
-    if (qualityScore < 75) {
+    if (qualityScore < 60) {
       return {
         canProceed: false,
-        blockingMessage: `🛑 **SPECIFICATION QUALITY INSUFFICIENT** (${qualityScore}/75 required)\n\n**YOU ARE PROHIBITED FROM PROCEEDING TO IMPLEMENTATION**`,
+        blockingMessage: `🛑 **SPECIFICATION QUALITY INSUFFICIENT** (${qualityScore}/60 required)\n\n**YOU ARE PROHIBITED FROM PROCEEDING TO IMPLEMENTATION**`,
         requiredActions: [
           '✅ Use `specify_requirements` with conversational mode',
           '✅ Answer all AI questions to refine requirements',
           '✅ Use `specify_verify` to check specification quality',
-          '✅ Iterate until quality score reaches 75+'
+          '✅ Iterate until quality score reaches 60+'
         ],
         strictInstructions: [
           '🎯 **YOU MUST**: Complete the conversational specification process',
-          '🎯 **YOU MUST**: Achieve minimum 75% quality score before proceeding',
+          '🎯 **YOU MUST**: Achieve minimum 60% quality score before proceeding',
           '🎯 **YOU MUST**: Use MCP verification tools to validate specification',
           '⚠️ **CRITICAL**: Any attempt to bypass this will result in poor quality software'
         ],
@@ -121,17 +121,17 @@ export class AgentBehaviorController {
   }
 
   private static generatePlanGuidance(qualityScore: number): AgentGuidance {
-    if (qualityScore < 80) {
+    if (qualityScore < 55) {
       return {
         canProceed: false,
-        blockingMessage: `🛑 **TECHNICAL PLAN QUALITY INSUFFICIENT** (${qualityScore}/80 required)`,
+        blockingMessage: `🛑 **TECHNICAL PLAN QUALITY INSUFFICIENT** (${qualityScore}/55 required)`,
         requiredActions: [
           '✅ Use `specify_plan` to create detailed technical architecture',
           '✅ Define technology stack, data models, and system design',
           '✅ Use `specify_verify` to validate plan quality'
         ],
         strictInstructions: [
-          '🎯 **YOU MUST**: Complete technical planning with 80%+ quality',
+          '🎯 **YOU MUST**: Complete technical planning with 55%+ quality',
           '🎯 **YOU MUST**: Define clear architecture before task breakdown'
         ],
         prohibitedActions: [
@@ -155,17 +155,17 @@ export class AgentBehaviorController {
   }
 
   private static generateTasksGuidance(qualityScore: number): AgentGuidance {
-    if (qualityScore < 78) {
+    if (qualityScore < 50) {
       return {
         canProceed: false,
-        blockingMessage: `🛑 **TASK BREAKDOWN QUALITY INSUFFICIENT** (${qualityScore}/78 required)`,
+        blockingMessage: `🛑 **TASK BREAKDOWN QUALITY INSUFFICIENT** (${qualityScore}/50 required)`,
         requiredActions: [
           '✅ Use `specify_tasks` to create detailed task breakdown',
           '✅ Define clear TDD approach and testing strategy',
           '✅ Ensure tasks are granular and testable'
         ],
         strictInstructions: [
-          '🎯 **YOU MUST**: Create comprehensive task breakdown with 78%+ quality',
+          '🎯 **YOU MUST**: Create comprehensive task breakdown with 50%+ quality',
           '🎯 **YOU MUST**: Include TDD guidance for each task'
         ],
         prohibitedActions: [
@@ -197,7 +197,7 @@ export class AgentBehaviorController {
       blockingMessage: `
 🚫 **IMPLEMENTATION BLOCKED - SDD WORKFLOW VIOLATION**
 
-📊 **Current Quality**: ${qualityScore}/85 (INSUFFICIENT)
+📊 **Current Quality**: ${qualityScore}/65 (INSUFFICIENT)
 
 ❌ **Blocking Issues**:
 ${blockingReasons.map(reason => `   • ${reason}`).join('\n')}

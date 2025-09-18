@@ -171,10 +171,10 @@ function generateStatusOverview(results: any): string {
 function getRequiredQuality(phase: string): number {
   const requirements: Record<string, number> = {
     'init': 0,
-    'spec': 75,
-    'plan': 80,
-    'tasks': 78,
-    'implement': 85
+    'spec': 60,
+    'plan': 55,
+    'tasks': 50,
+    'implement': 65
   };
   return requirements[phase] || 0;
 }

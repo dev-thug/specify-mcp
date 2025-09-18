@@ -156,7 +156,11 @@ export class DocumentManagerTool {
           if (!grouped[type]) {
             grouped[type] = [];
           }
-          grouped[type].push(resource);
+          // Type guard to ensure grouped[type] exists
+          const typeGroup = grouped[type];
+          if (typeGroup) {
+            typeGroup.push(resource);
+          }
         }
       } catch (error) {
         console.warn(`Failed to process resource: ${resource.uri}`, error);

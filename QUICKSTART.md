@@ -312,10 +312,10 @@ if (enforcement.blocked) {
 
 | Phase | Minimum Quality | Required Before |
 |-------|----------------|-----------------|  
-| spec | 75% | Planning |
-| plan | 80% | Task breakdown |
-| tasks | 78% | Implementation |
-| implement | 85% | Code generation |
+| spec | 60% | Planning |
+| plan | 55% | Task breakdown |
+| tasks | 50% | Implementation |
+| implement | 65% | Code generation |
 
 ### **Remember**: 
 > *"Through iterative dialogue with AI, this idea becomes a comprehensive PRD"*
